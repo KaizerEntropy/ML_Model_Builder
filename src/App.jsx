@@ -101,15 +101,39 @@ export default function App() {
         let by = b.top - box.top;
 
         if (mode === "unet") {
-           const isFromDec = graph[i].kind.startsWith("u_dec") || graph[i].kind === "u_seg_head";
-           const isToDec = graph[i+1].kind.startsWith("u_dec") || graph[i+1].kind === "u_seg_head";
+           let startSide = 'bottom';
+           let endSide = 'top';
            
-           if (isFromDec && isToDec) {
-              // Decoder going up
-              ay = a.top - box.top; // arrow starts from top of decoder
-              by = b.top - box.top + b.height + 4; // enters bottom of next decoder (which is visually higher up)
+           if (b.top < a.top - 20) {
+               // B is visually ABOVE A (Going up the decoder)
+               startSide = 'top';
+               endSide = 'bottom';
+           } else if (b.left > a.left + 50 && Math.abs(b.top - a.top) < 80) {
+               // B is to the RIGHT of A (Bottleneck horizontal step)
+               startSide = 'right';
+               endSide = 'left';
            }
-           sPaths.push(`M ${ax} ${ay} C ${ax} ${ay+(isFromDec?-40:40)}, ${bx} ${by+(isToDec?-40:40)}, ${bx} ${by+(isFromDec?-4:0)}`);
+           
+           if (startSide === 'top') {
+               ay = a.top - box.top;
+           } else if (startSide === 'right') {
+               ax = a.right - box.left;
+               ay = a.top - box.top + a.height/2;
+           }
+           
+           if (endSide === 'bottom') {
+               by = b.top - box.top + b.height + 4;
+           } else if (endSide === 'left') {
+               bx = b.left - box.left - 4;
+               by = b.top - box.top + b.height/2;
+           }
+           
+           const cp1x = startSide === 'right' ? ax + 40 : ax;
+           const cp1y = startSide === 'bottom' ? ay + 40 : startSide === 'top' ? ay - 40 : ay;
+           const cp2x = endSide === 'left' ? bx - 40 : bx;
+           const cp2y = endSide === 'top' ? by - 40 : endSide === 'bottom' ? by + 40 : by;
+           
+           sPaths.push(`M ${ax} ${ay} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${bx} ${by}`);
         } else {
            sPaths.push(`M ${ax} ${ay} L ${bx} ${by-4}`);
         }
@@ -257,11 +281,13 @@ export default function App() {
           ))}
         </nav>
         <div className="actions">
-          <button className="primary" onClick={() => {
+          <button className="icon-btn" title="Copy Code" onClick={() => navigator.clipboard.writeText(generatedCode).then(()=>setToast("Code Copied!"))}><Copy size={18} /></button>
+          <button className="icon-btn" title="Download Code" onClick={() => {
             const blob = new Blob([generatedCode], { type: "text/plain" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a"); a.href = url; a.download = `model_${mode}.py`; a.click();
-          }}><Download size={16}/> Export Code</button>
+          }}><Download size={18} /></button>
+          <button className="primary" onClick={() => window.open("https://kaggle.com/code/new", "_blank")}>Run in Kaggle</button>
         </div>
       </header>
 
