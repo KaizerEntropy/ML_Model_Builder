@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Bot, BrainCircuit, Braces, ChevronDown, ChevronUp, Copy, Database, Download, GitBranch, Plus, RefreshCcw, Search, Sparkles, Trash2, Box, Activity, AlertTriangle, XCircle, GripVertical } from "lucide-react";
+import { Bot, BrainCircuit, Box, GitBranch, Copy, Download, Image as ImageIcon, Plus, Search, Sparkles, Trash2, AlertTriangle, XCircle } from "lucide-react";
+import { toPng } from 'html-to-image';
+
 import { cnnCatalog, transformerCatalog, unetCatalog, mlCatalog, lossCatalog, attentionKinds, residualKinds, convLikeKinds, activations } from "./data/catalogs.js";
 import { imageDatasets, csvDatasets, augmentations } from "./data/datasets.js";
 import { calculateShapes } from "./utils/shapeCalc.js";
@@ -74,12 +76,15 @@ export default function App() {
   const [dataset, setDataset] = useState(initialData);
   const [selectedAugs, setSelectedAugs] = useState(["Resize", "HorizontalFlip", "Normalize"]);
   const [toast, setToast] = useState("");
+  
+  const [seqPaths, setSeqPaths] = useState([]);
   const [skipPaths, setSkipPaths] = useState([]);
   
   const [draggedId, setDraggedId] = useState(null);
   const [dropTargetIdx, setDropTargetIdx] = useState(null);
 
   const canvasRef = useRef(null);
+  const canvasInnerRef = useRef(null);
   const nodeRefs = useRef(new Map());
 
   const graph = graphs[mode];
@@ -100,14 +105,80 @@ export default function App() {
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(""), 2000);
+    const t = setTimeout(() => setToast(""), 2500);
     return () => clearTimeout(t);
   }, [toast]);
 
   useLayoutEffect(() => {
-    renderSkipPaths();
-    window.addEventListener("resize", renderSkipPaths);
-    return () => window.removeEventListener("resize", renderSkipPaths);
+    const renderPaths = () => {
+      if (!canvasInnerRef.current) return;
+      const box = canvasInnerRef.current.getBoundingClientRect();
+      const sPaths = [];
+      const kPaths = [];
+      
+      // 1. Sequence Arrows
+      for (let i = 0; i < graph.length - 1; i++) {
+        const from = nodeRefs.current.get(graph[i].id);
+        const to = nodeRefs.current.get(graph[i+1].id);
+        if (!from || !to) continue;
+        const a = from.getBoundingClientRect();
+        const b = to.getBoundingClientRect();
+        const ax = a.left - box.left + a.width/2;
+        const ay = a.top - box.top + a.height;
+        const bx = b.left - box.left + b.width/2;
+        const by = b.top - box.top;
+        
+        if (mode === "unet") {
+           // Curve for U-Net layout transitions
+           sPaths.push(`M ${ax} ${ay} C ${ax} ${ay+40}, ${bx} ${by-40}, ${bx} ${by-4}`);
+        } else {
+           sPaths.push(`M ${ax} ${ay} L ${bx} ${by-4}`);
+        }
+      }
+      
+      // 2. ResNet Skip Paths
+      graph.forEach(b => {
+        if (!b.params.skipTo) return;
+        const from = nodeRefs.current.get(b.id);
+        const to = nodeRefs.current.get(b.params.skipTo);
+        if (!from || !to) return;
+        const a = from.getBoundingClientRect();
+        const bBox = to.getBoundingClientRect();
+        const x1 = a.right - box.left + 8;
+        const y1 = a.top - box.top + a.height * 0.3;
+        const x2 = bBox.right - box.left + 8;
+        const y2 = bBox.top - box.top + bBox.height * 0.7;
+        const rail = Math.max(x1, x2) + 60;
+        kPaths.push({ d:`M ${x1} ${y1} C ${rail} ${y1}, ${rail} ${y2}, ${x2+4} ${y2}`, type: 'resnet' });
+      });
+
+      // 3. U-Net Skip Paths (Auto-generated from Enc -> Dec)
+      if (mode === "unet") {
+        const encs = graph.filter(b => b.kind.startsWith("u_enc"));
+        const decs = graph.filter(b => b.kind.startsWith("u_dec"));
+        const pairs = Math.min(encs.length, decs.length);
+        for(let i = 0; i < pairs; i++) {
+          const from = nodeRefs.current.get(encs[i].id);
+          const to = nodeRefs.current.get(decs[decs.length - 1 - i].id);
+          if (!from || !to) continue;
+          const a = from.getBoundingClientRect();
+          const bBox = to.getBoundingClientRect();
+          const x1 = a.right - box.left;
+          const y1 = a.top - box.top + a.height/2;
+          const x2 = bBox.left - box.left;
+          const y2 = bBox.top - box.top + bBox.height/2;
+          kPaths.push({ d:`M ${x1} ${y1} L ${x2-4} ${y2}`, type: 'unet' });
+        }
+      }
+      
+      setSeqPaths(sPaths);
+      setSkipPaths(kPaths);
+    };
+
+    // Small timeout ensures DOM has fully painted the new grid layout before we calculate boxes
+    const t = setTimeout(renderPaths, 50);
+    window.addEventListener("resize", renderPaths);
+    return () => { clearTimeout(t); window.removeEventListener("resize", renderPaths); };
   }, [graph, mode]);
 
   function updateGraph(nextGraph) {
@@ -152,37 +223,31 @@ export default function App() {
     }
   }
 
-  function renderSkipPaths() {
-    if (mode === "ml" || !canvasRef.current) return setSkipPaths([]);
-    const box = canvasRef.current.getBoundingClientRect();
-    const paths = [];
-    graph.forEach(b => {
-      if (!b.params.skipTo) return;
-      const from = nodeRefs.current.get(b.id);
-      const to = nodeRefs.current.get(b.params.skipTo);
-      if (!from || !to) return;
-      const a = from.getBoundingClientRect();
-      const bBox = to.getBoundingClientRect();
-      const x1 = a.right - box.left + canvasRef.current.scrollLeft + 8;
-      const y1 = a.top - box.top + canvasRef.current.scrollTop + a.height * 0.3;
-      const x2 = bBox.right - box.left + canvasRef.current.scrollLeft + 8;
-      const y2 = bBox.top - box.top + canvasRef.current.scrollTop + bBox.height * 0.7;
-      const rail = Math.max(x1, x2) + 60;
-      paths.push(`M ${x1} ${y1} C ${rail} ${y1}, ${rail} ${y2}, ${x2} ${y2}`);
-    });
-    setSkipPaths(paths);
+  function captureDiagram() {
+    if (!canvasInnerRef.current) return;
+    setToast("Capturing diagram...");
+    toPng(canvasInnerRef.current, { backgroundColor: '#060608', style: { transform: 'scale(1)', transformOrigin: 'top left' }})
+      .then(url => {
+        const a = document.createElement("a");
+        a.href = url; a.download = `model_forge_${mode}.png`; a.click();
+        setToast("Diagram saved successfully!");
+      })
+      .catch(() => setToast("Failed to capture diagram"));
   }
 
   const catalogGroups = groupBy(catalog.filter(i => !query || `${i.group} ${i.label} ${i.kind}`.toLowerCase().includes(query.toLowerCase())), "group");
+
+  // Calculate U-Net grid positions
+  let currentEnc = 1, currentDec = 1;
 
   return (
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <div className="logo">CF</div>
+          <div className="logo">MF</div>
           <div>
-            <h1>CNN Forge</h1>
-            <p>Visual Model Builder • PyTorch & Scikit-Learn</p>
+            <h1>Model Forge</h1>
+            <p>Visual Architecture Builder • PyTorch & Scikit-Learn</p>
           </div>
         </div>
         <nav className="tabs">
@@ -191,9 +256,9 @@ export default function App() {
           ))}
         </nav>
         <div className="actions">
-          <button className="icon-btn" title="Copy Code" onClick={() => navigator.clipboard.writeText(generatedCode).then(()=>setToast("Copied!"))}><Copy size={18} /></button>
+          <button className="icon-btn" title="Copy Code" onClick={() => navigator.clipboard.writeText(generatedCode).then(()=>setToast("Code Copied!"))}><Copy size={18} /></button>
           <button className="icon-btn" title="Download Code" onClick={() => downloadFile(`model_${mode}.py`, generatedCode, "text/plain")}><Download size={18} /></button>
-          <button className="primary" onClick={() => window.open("https://kaggle.com/code/new", "_blank")}>Kaggle</button>
+          <button className="primary" onClick={() => window.open("https://kaggle.com/code/new", "_blank")}>Run in Kaggle</button>
         </div>
       </header>
 
@@ -205,11 +270,11 @@ export default function App() {
           </div>
           <div className="mode-switch">
             <button className={mode === "cnn" ? "active" : ""} onClick={() => {setMode("cnn"); setDataset(imageDatasets[0]);}}><BrainCircuit size={14}/> CNN</button>
-            <button className={mode === "transformer" ? "active" : ""} onClick={() => {setMode("transformer"); setDataset(imageDatasets[0]);}}><Box size={14}/> Transformer</button>
+            <button className={mode === "transformer" ? "active" : ""} onClick={() => {setMode("transformer"); setDataset(imageDatasets[0]);}}><Box size={14}/> ViT</button>
             <button className={mode === "unet" ? "active" : ""} onClick={() => {setMode("unet"); setDataset(imageDatasets[0]);}}><GitBranch size={14}/> U-Net</button>
             <button className={mode === "ml" ? "active" : ""} onClick={() => {setMode("ml"); setDataset(csvDatasets[0]);}}><Bot size={14}/> ML</button>
           </div>
-          <label className="search-row"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search..."/></label>
+          <label className="search-row"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search library..."/></label>
           <div className="scroll">
             {Object.entries(catalogGroups).map(([group, items]) => (
               <section className="section" key={group}>
@@ -232,11 +297,12 @@ export default function App() {
           <section className="panel canvas-panel">
             <div className="canvas-toolbar">
               <div className="chip-row">
-                <span className="chip">{dataset.name}</span>
-                <span className="chip">{graph.length} blocks</span>
+                <span className="chip hot">{dataset.name}</span>
+                <span className="chip shape">{graph.length} blocks</span>
               </div>
               <div className="toolbar-actions">
-                <button onClick={() => updateGraph([])}><Trash2 size={16}/> Clear</button>
+                <button onClick={captureDiagram}><ImageIcon size={16}/> Export Diagram</button>
+                <button onClick={() => updateGraph([])}><Trash2 size={16}/> Clear Canvas</button>
               </div>
             </div>
             
@@ -247,44 +313,73 @@ export default function App() {
               </div>
             )}
 
-            <div className="canvas" ref={canvasRef} onDragOver={e=>e.preventDefault()} onDrop={e=>handleDrop(e, graph.length)}>
-              <svg className="skip-layer" aria-hidden="true">
-                {skipPaths.map((p, i) => <path key={i} className="skip-path" d={p} />)}
-              </svg>
-              <div className="pipeline">
-                {!graph.length && <div className="empty">Drag & drop blocks here</div>}
-                {graph.map((block, idx) => (
-                  <div key={block.id} style={{width:'100%', display:'flex', flexDirection:'column', alignItems:'center'}}>
-                    {dropTargetIdx === idx && <div className="drop-indicator"/>}
-                    <div className="connector"/>
-                    <article 
-                      ref={el => el ? nodeRefs.current.set(block.id, el) : nodeRefs.current.delete(block.id)}
-                      className={`node ${mode} ${selectedId === block.id ? "selected" : ""} ${issues.get(block.id)==="error"?"v-error":issues.get(block.id)==="warning"?"v-warning":""} ${draggedId===block.id?"dragging":""}`}
-                      onClick={() => setSelectedId(block.id)}
-                      draggable
-                      onDragStart={e => { e.dataTransfer.setData("app/id", block.id); setDraggedId(block.id); }}
-                      onDragEnd={() => { setDraggedId(null); setDropTargetIdx(null); }}
-                      onDragOver={e => handleDropTarget(e, idx)}
-                      onDrop={e => handleDrop(e, idx)}
-                    >
-                      <div className="node-top">
-                        <div className="drag-handle"><span/><span/><span/></div>
-                        <span className="glyph">{block.glyph}</span>
-                        <div><strong>{block.label}</strong><small>{block.kind}</small></div>
-                        <button className="icon-btn" onClick={e=>{e.stopPropagation(); updateGraph(graph.filter(b=>b.id!==block.id))}}><Trash2 size={16}/></button>
+            <div className="canvas-container" ref={canvasRef} onDragOver={e=>e.preventDefault()} onDrop={e=>handleDrop(e, graph.length)}>
+              <div className="canvas-inner" ref={canvasInnerRef}>
+                <svg className="svg-layer" aria-hidden="true">
+                  <defs>
+                    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+                      <polygon points="0 0, 8 4, 0 8" fill="var(--red)" />
+                    </marker>
+                    <marker id="arrowhead-resnet" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+                      <polygon points="0 0, 8 4, 0 8" fill="var(--amber)" />
+                    </marker>
+                    <marker id="arrowhead-unet" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+                      <polygon points="0 0, 8 4, 0 8" fill="var(--teal)" />
+                    </marker>
+                  </defs>
+                  {seqPaths.map((p, i) => <path key={'s'+i} className="seq-arrow" d={p} markerEnd="url(#arrowhead)" />)}
+                  {skipPaths.map((p, i) => <path key={'k'+i} className={p.type === 'unet' ? 'skip-path-unet' : 'skip-path'} d={p.d} markerEnd={`url(#arrowhead-${p.type})`} />)}
+                </svg>
+                
+                <div className={`pipeline ${mode === 'unet' ? 'unet-layout' : ''}`}>
+                  {!graph.length && <div className="empty">Drag & drop architecture blocks here</div>}
+                  
+                  {graph.map((block, idx) => {
+                    const gridStyle = {};
+                    if (mode === "unet") {
+                      if (block.kind.startsWith("u_enc") || block.kind === "u_input") {
+                        gridStyle.gridColumn = 1; gridStyle.gridRow = currentEnc++;
+                      } else if (block.kind.includes("bottleneck") || block.kind.includes("bridge")) {
+                        gridStyle.gridColumn = 2; gridStyle.gridRow = Math.max(currentEnc, 2);
+                      } else {
+                        gridStyle.gridColumn = 3; gridStyle.gridRow = Math.max(1, currentEnc - currentDec);
+                        currentDec++;
+                      }
+                    }
+
+                    return (
+                      <div key={block.id} className="node-wrapper" style={gridStyle}>
+                        {dropTargetIdx === idx && <div className="drop-indicator"/>}
+                        <article 
+                          ref={el => el ? nodeRefs.current.set(block.id, el) : nodeRefs.current.delete(block.id)}
+                          className={`node ${mode} ${selectedId === block.id ? "selected" : ""} ${issues.get(block.id)==="error"?"v-error":issues.get(block.id)==="warning"?"v-warning":""} ${draggedId===block.id?"dragging":""}`}
+                          onClick={() => setSelectedId(block.id)}
+                          draggable
+                          onDragStart={e => { e.dataTransfer.setData("app/id", block.id); setDraggedId(block.id); }}
+                          onDragEnd={() => { setDraggedId(null); setDropTargetIdx(null); }}
+                          onDragOver={e => handleDropTarget(e, idx)}
+                          onDrop={e => handleDrop(e, idx)}
+                        >
+                          <div className="node-top">
+                            <div className="drag-handle"><span/><span/><span/></div>
+                            <span className="glyph">{block.glyph}</span>
+                            <div><strong>{block.label}</strong><small>{block.kind}</small></div>
+                            <button className="icon-btn" onClick={e=>{e.stopPropagation(); updateGraph(graph.filter(b=>b.id!==block.id))}}><Trash2 size={16}/></button>
+                          </div>
+                          <div className="node-body">
+                            {mode !== "ml" && shapes[idx] && (
+                              <span className="chip dim-flow">
+                                {shapes[idx].h_in}×{shapes[idx].w_in}×{shapes[idx].c_in} → {shapes[idx].h}×{shapes[idx].w}×{shapes[idx].c}
+                              </span>
+                            )}
+                            {block.attention?.map(a => <span key={a.id} className="chip attn">{a.label}</span>)}
+                          </div>
+                        </article>
                       </div>
-                      <div className="node-body">
-                        {mode !== "ml" && shapes[idx] && (
-                          <span className="chip dim-flow">
-                            {shapes[idx].h_in}×{shapes[idx].w_in}×{shapes[idx].c_in} → {shapes[idx].h}×{shapes[idx].w}×{shapes[idx].c}
-                          </span>
-                        )}
-                        {block.attention?.map(a => <span key={a.id} className="chip attn">{a.label}</span>)}
-                      </div>
-                    </article>
-                  </div>
-                ))}
-                {dropTargetIdx === graph.length && <div className="drop-indicator" style={{marginTop:'10px'}}/>}
+                    );
+                  })}
+                  {dropTargetIdx === graph.length && <div className="drop-indicator" style={{bottom: '-20px', top: 'auto'}}/>}
+                </div>
               </div>
             </div>
           </section>
@@ -294,18 +389,20 @@ export default function App() {
           <section className="panel" style={{gridColumn: "2 / span 2"}}>
             {view === "data" && (
               <div className="scroll">
-                <h2>Datasets</h2>
+                <h2>Compatible Datasets</h2>
                 <div className="dataset-grid">
-                  {(mode === "ml" ? csvDatasets : imageDatasets).map(d => (
+                  {(mode === "ml" ? csvDatasets : imageDatasets)
+                    .filter(d => d.compatible.includes(mode))
+                    .map(d => (
                     <div key={d.name} className={`dataset-card ${dataset.name === d.name ? "active" : ""}`} onClick={() => setDataset(d)}>
-                      <div><strong>{d.name}</strong> <a href={d.url} target="_blank">Link</a></div>
+                      <div><strong>{d.name}</strong> <a href={d.url} target="_blank" rel="noreferrer">View Source</a></div>
                       <small>{d.category} • {d.classes||d.target} • {d.size||d.samples}</small>
                     </div>
                   ))}
                 </div>
                 {mode !== "ml" && (
-                  <div style={{marginTop: 20}}>
-                    <h2>Augmentations</h2>
+                  <div style={{marginTop: 24}}>
+                    <h2>Image Augmentations</h2>
                     <div className="check-grid">
                       {augmentations.map(a => (
                         <label key={a} className="check">
@@ -330,8 +427,8 @@ export default function App() {
                 </div>
                 
                 {losses[mode] && Object.keys(losses[mode].params).length > 0 && (
-                  <div style={{marginTop: 20}}>
-                    <h2>Loss Parameters</h2>
+                  <div style={{marginTop: 24}}>
+                    <h2>Hyperparameters</h2>
                     <div className="form-grid">
                       {Object.entries(losses[mode].params).map(([k,v]) => (
                         <label key={k}>{k} <input type="number" step="0.1" value={v} onChange={e => setLosses(p => ({...p, [mode]: {...p[mode], params:{...p[mode].params, [k]: Number(e.target.value)}}}) )}/></label>
@@ -350,10 +447,10 @@ export default function App() {
           <aside className="panel inspector-panel">
             <div className="panel-header"><div><span>Inspector</span><strong>Block Settings</strong></div></div>
             <div className="inspector-scroll scroll">
-              {!selected ? <div className="empty" style={{marginTop:40, minHeight:80}}>Select a block to edit</div> : (
+              {!selected ? <div className="empty" style={{marginTop:40, minHeight:80}}>Select a block to inspect</div> : (
                 <>
                   <div className="section">
-                    <h2>{selected.label}</h2>
+                    <h2>{selected.label} Config</h2>
                     <div className="form-grid">
                       {Object.keys(selected.params).map(k => (
                         k !== "skipTo" && (
@@ -369,9 +466,9 @@ export default function App() {
                         )
                       ))}
                       {(mode === "cnn" && residualKinds.has(selected.kind)) && (
-                         <label className="wide">Skip Target
+                         <label className="wide">Skip Connection Target
                            <select value={selected.params.skipTo||""} onChange={e => updateGraph(graph.map(b=>b.id===selected.id?{...b,params:{...b.params,skipTo:e.target.value}}:b))}>
-                             <option value="">Next block only</option>
+                             <option value="">No Skip (Next Block)</option>
                              {graph.slice(graph.findIndex(b=>b.id===selected.id)+1).map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
                            </select>
                          </label>
