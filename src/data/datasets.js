@@ -13,6 +13,14 @@ export const imageDatasets = [
   { category: "Blood Classifications", name: "Blood Cell (BCCD)", classes: 4, size: "12,444 images", shape: [224, 224, 3], url: "https://www.kaggle.com/datasets/paultimothymooney/blood-cells", compatible: "cnn/transformer/unet" },
   { category: "Blood Classifications", name: "BloodMNIST", classes: 8, size: "17,092 images", shape: [28, 28, 3], url: "https://medmnist.com/", compatible: "cnn/transformer" },
 
+  /* Brain Tumor */
+  { category: "Brain Tumor", name: "BraTS 2021", classes: 4, size: "8,000+ MRI scans", shape: [240, 240, 4], url: "https://www.med.upenn.edu/cbica/brats2021/", compatible: "cnn/transformer/unet" },
+  { category: "Brain Tumor", name: "Brain Tumor MRI", classes: 4, size: "7,023 images", shape: [224, 224, 3], url: "https://www.kaggle.com/datasets/masoudnickparvar/brain-tumor-mri-dataset", compatible: "cnn/transformer/unet" },
+
+  /* Breast Cancer */
+  { category: "Breast Cancer", name: "BreakHis", classes: 8, size: "7,909 images", shape: [224, 224, 3], url: "https://web.inf.ufpr.br/vri/databases/breast-cancer-histopathological-database-breakhis/", compatible: "cnn/transformer/unet" },
+  { category: "Breast Cancer", name: "CBIS-DDSM", classes: 2, size: "10,239 images", shape: [224, 224, 1], url: "https://wiki.cancerimagingarchive.net/display/Public/CBIS-DDSM", compatible: "cnn/transformer" },
+
   /* Natural/Other */
   { category: "Natural Benchmarks", name: "CIFAR-10", classes: 10, size: "60k 32×32", shape: [32, 32, 3], url: "https://www.cs.toronto.edu/~kriz/cifar.html", compatible: "cnn/transformer" },
   { category: "Natural Benchmarks", name: "ImageNet Mini", classes: 1000, size: "subset", shape: [224, 224, 3], url: "https://www.image-net.org/", compatible: "cnn/transformer" },

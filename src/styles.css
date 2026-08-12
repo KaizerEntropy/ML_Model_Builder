@@ -339,6 +339,7 @@ h2 { margin: 0 0 16px; color:var(--text); font-size:14px; font-weight:800; lette
   padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius);
   background:#101015;cursor:pointer;transition:all 0.2s;
 }
+.loss-card div { display: flex; flex-direction: column; gap: 4px; }
 .loss-card:hover{border-color:rgba(255,27,58,0.5)}
 .loss-card.active{border-color:var(--red);box-shadow:0 0 0 2px rgba(255,27,58,0.15);background:#1a0f12}
 

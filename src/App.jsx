@@ -296,7 +296,10 @@ export default function App() {
           <aside className="panel">
             <div className="panel-header">
               <div><span>Library</span><strong>{mode.toUpperCase()} Blocks</strong></div>
-              <button onClick={() => setLeftOpen(false)}><ChevronLeft size={14}/></button>
+              <div className="actions">
+                <button onClick={() => setGraphs(p=>({...p,[mode]:makePreset(mode, dataset)}))}><Sparkles size={14} /> Preset</button>
+                <button onClick={() => setLeftOpen(false)}><ChevronLeft size={14}/></button>
+              </div>
             </div>
             <div className="mode-switch">
               <button className={mode === "cnn" ? "active" : ""} onClick={() => {setMode("cnn"); setDataset(imageDatasets[0]);}}><BrainCircuit size={14}/> CNN</button>
@@ -337,12 +340,6 @@ export default function App() {
                 <button onClick={() => setGraphs(p=>({...p,[mode]:[]}))}><Trash2 size={16}/> Clear Canvas</button>
               </div>
             </div>
-            {(validation.errors.length > 0 || validation.warnings.length > 0) && (
-              <div className="validation-banner">
-                {validation.errors.map((e, i) => <div key={'e'+i} className="v-error"><XCircle size={14} className="v-icon"/> {e.message}</div>)}
-                {validation.warnings.map((w, i) => <div key={'w'+i} className="v-warn"><AlertTriangle size={14} className="v-icon"/> {w.message}</div>)}
-              </div>
-            )}
 
             <div className="canvas-container" ref={canvasRef} onDragOver={handleDragOverCanvas} onDrop={e=>handleDrop(e, graph.length)}>
               <div className="canvas-inner" ref={canvasInnerRef}>
@@ -374,7 +371,7 @@ export default function App() {
                           onDragStart={e => { e.dataTransfer.setData("app/id", block.id); setDraggedId(block.id); }}
                           onDragEnd={() => { setDraggedId(null); setDropTargetIdx(null); dragScrollRef.current=0; }}
                           onDragOver={e => handleDropTarget(e, idx)}
-                          onDrop={e => handleDrop(e, idx)}
+                          onDrop={e => { e.stopPropagation(); handleDrop(e, idx); }}
                         >
                           <div className="node-top">
                             <div className="drag-handle"><span/><span/><span/></div>
@@ -401,8 +398,8 @@ export default function App() {
             {view === "data" && (
               <div className="scroll">
                 <h2>Compatible Datasets</h2>
-                <div className="tabs" style={{marginBottom:16}}>
-                  {["All", "Cervical Cancer", "Skin Cancer", "Blood Classifications", "Natural Benchmarks", "Classical ML"].map(t => (
+                <div className="tabs" style={{marginBottom:16, overflowX:'auto', whiteSpace:'nowrap'}}>
+                  {["All", "Cervical Cancer", "Skin Cancer", "Blood Classifications", "Brain Tumor", "Breast Cancer", "Natural Benchmarks", "Classical ML"].map(t => (
                     <button key={t} className={dataFilter === t ? "active" : ""} onClick={()=>setDataFilter(t)}>{t}</button>
                   ))}
                 </div>
