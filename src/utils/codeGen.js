@@ -9,6 +9,8 @@ function attExpr(att, ch) {
   if (att.kind === "coordattn") return `CoordinateAttention(${ch}, ratio=${att.params.ratio})`;
   if (att.kind === "selfattn") return `SelfAttention2d(${ch}, heads=${att.params.heads})`;
   if (att.kind === "gca") return `GlobalContextBlock(${ch}, ratio=${att.params.ratio})`;
+  if (att.kind === "spatialattn") return `SpatialAttention(kernel_size=${att.params.kernel})`;
+  if (att.kind === "ccattn") return `CrissCrossAttention()`;
   return "";
 }
 
@@ -76,6 +78,7 @@ optimizer = optim.${opt}(model.parameters(), lr=LEARNING_RATE)
 best_loss = float('inf')
 best_model_wts = copy.deepcopy(model.state_dict())
 train_losses, val_losses = [], []
+${isSeg && vis.includes("iou_trend") ? `val_ious = []` : ""}
 
 print(f"Starting Training on {DEVICE} for {EPOCHS} epochs...")
 for epoch in range(EPOCHS):
@@ -95,6 +98,7 @@ for epoch in range(EPOCHS):
     model.eval()
     val_loss = 0.0
     ${vis.includes("confusion_matrix") && !isSeg ? `all_preds = []\n    all_targets = []` : ""}
+    ${isSeg && vis.includes("iou_trend") ? `epoch_iou = 0.0` : ""}
     with torch.no_grad():
         for inputs, targets in val_loader:
             inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
@@ -102,8 +106,10 @@ for epoch in range(EPOCHS):
             loss = criterion(outputs, targets)
             val_loss += loss.item() * inputs.size(0)
             ${vis.includes("confusion_matrix") && !isSeg ? `all_preds.extend(torch.argmax(outputs, dim=1).cpu().numpy())\n            all_targets.extend(targets.cpu().numpy())` : ""}
+            ${isSeg && vis.includes("iou_trend") ? `preds = (torch.sigmoid(outputs) > 0.5).float()\n            intersection = (preds * targets).sum()\n            union = preds.sum() + targets.sum() - intersection\n            epoch_iou += (intersection / (union + 1e-6)).item() * inputs.size(0)` : ""}
     epoch_val_loss = val_loss / len(val_loader.dataset)
     val_losses.append(epoch_val_loss)
+    ${isSeg && vis.includes("iou_trend") ? `val_ious.append(epoch_iou / len(val_loader.dataset))` : ""}
 
     print(f"Epoch {epoch+1}/{EPOCHS} - Train Loss: {epoch_train_loss:.4f} - Val Loss: {epoch_val_loss:.4f}")
     if epoch_val_loss < best_loss:
@@ -148,6 +154,47 @@ from sklearn.manifold import TSNE
 print("t-SNE requested. Please ensure you extract the feature embeddings before the classification head.")
 `;
   }
+
+  if (isSeg && vis.includes("mask_overlay")) {
+    code += `
+# Mask Overlay Visualization
+print("Visualizing Validation Prediction Overlays...")
+model.eval()
+with torch.no_grad():
+    inputs, targets = next(iter(val_loader))
+    inputs = inputs.to(DEVICE)
+    outputs = model(inputs)
+    preds = (torch.sigmoid(outputs) > 0.5).float().cpu()
+    inputs = inputs.cpu()
+    
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    if inputs.shape[1] == 3:
+        axes[0].imshow(inputs[0].permute(1, 2, 0).numpy())
+    else:
+        axes[0].imshow(inputs[0][0].numpy(), cmap='gray')
+    axes[0].set_title("Input Image")
+    axes[1].imshow(targets[0][0].numpy(), cmap='gray')
+    axes[1].set_title("Ground Truth Mask")
+    axes[2].imshow(preds[0][0].numpy(), cmap='gray')
+    axes[2].set_title("Predicted Mask")
+    for ax in axes: ax.axis('off')
+    plt.show()
+`;
+  }
+
+  if (isSeg && vis.includes("iou_trend")) {
+    code += `
+# IoU Trend Visualization
+plt.figure(figsize=(8,5))
+plt.plot(val_ious, label='Validation Mean IoU', color='green')
+plt.title('Validation IoU over Epochs')
+plt.xlabel('Epochs')
+plt.ylabel('IoU Score')
+plt.legend()
+plt.show()
+`;
+  }
+
   return code;
 }
 
@@ -155,7 +202,7 @@ print("t-SNE requested. Please ensure you extract the feature embeddings before 
 // ARCHITECTURE GEN
 // =======================
 
-export function generateTorchCode(graph, dataset, augs, lossConfig, trainSettings) {
+export function generateTorchCode(graph, dataset, augs, lossConfig, trainSettings, filterConfig="None") {
   let c = dataset.shape[2], li = 0; const lm = new Map(), lines = [];
   graph.forEach(b => {
     const p = b.params; if (b.kind === "input") { c = Number(p.c || c); return; }
@@ -170,9 +217,19 @@ export function generateTorchCode(graph, dataset, augs, lossConfig, trainSetting
     else if (b.kind === "resnet") { out = p.out; expr = `ResidualBlock(${c}, ${out}, stride=${p.stride}, activation=${Q(p.activation)})`; }
     else if (b.kind === "resnext") { out = p.out; expr = `ResNeXtBlock(${c}, ${out}, cardinality=${p.cardinality}, stride=${p.stride}, activation=${Q(p.activation)})`; }
     else if (b.kind === "mobilenet") { out = p.out; expr = `InvertedResidual(${c}, ${out}, stride=${p.stride}, expansion=${p.expansion}, activation=${Q(p.activation)})`; }
+    else if (b.kind === "mobilenet_v2") { expr = "models.mobilenet_v2(pretrained=True)"; out = 1000; }
+    else if (b.kind === "mobilenet_v3") { expr = "models.mobilenet_v3_large(pretrained=True)"; out = 1000; }
     else if (b.kind === "efficientnet") { out = p.out; expr = `MBConv(${c}, ${out}, stride=${p.stride}, expansion=${p.expansion}, se_ratio=${p.se_ratio}, activation=${Q(p.activation)})`; }
     else if (b.kind === "fusedmb") { out = p.out; expr = `FusedMBConv(${c}, ${out}, stride=${p.stride}, expansion=${p.expansion}, activation=${Q(p.activation)})`; }
+    else if (b.kind === "efficientnet_b0") { expr = "models.efficientnet_b0(pretrained=True)"; out = 1000; }
+    else if (b.kind === "efficientnet_b4") { expr = "models.efficientnet_b4(pretrained=True)"; out = 1000; }
+    else if (b.kind === "efficientnet_b7") { expr = "models.efficientnet_b7(pretrained=True)"; out = 1000; }
     else if (b.kind === "shuffle") { out = p.out; expr = `ShuffleUnit(${c}, ${out}, groups=${p.groups}, stride=${p.stride}, activation=${Q(p.activation)})`; }
+    else if (b.kind === "resnet18") { expr = "models.resnet18(pretrained=True)"; out = 1000; }
+    else if (b.kind === "resnet34") { expr = "models.resnet34(pretrained=True)"; out = 1000; }
+    else if (b.kind === "resnet50") { expr = "models.resnet50(pretrained=True)"; out = 1000; }
+    else if (b.kind === "densenet121") { expr = "models.densenet121(pretrained=True)"; out = 1000; }
+    else if (b.kind === "densenet169") { expr = "models.densenet169(pretrained=True)"; out = 1000; }
     else if (b.kind === "inception") { out = p.out; expr = `InceptionBlock(${c}, ${out}, activation=${Q(p.activation)})`; }
     else if (b.kind === "aspp") { out = p.out; expr = `ASPPBlock(${c}, ${out}, activation=${Q(p.activation)})`; }
     else if (b.kind === "convnext") { out = p.out; expr = `ConvNeXtBlock(${c}, ${out}, kernel_size=${p.kernel}, activation=${Q(p.activation)})`; }
@@ -220,6 +277,7 @@ export function generateTorchCode(graph, dataset, augs, lossConfig, trainSetting
   return `import torch, torch.nn as nn
 from collections import OrderedDict
 from torchvision import transforms
+import torchvision.models as models
 
 def activation_layer(name):
     return {"ReLU":nn.ReLU(True),"GELU":nn.GELU(),"SiLU":nn.SiLU(True),"Mish":nn.Mish(),"LeakyReLU":nn.LeakyReLU(0.1,True),"ReLU6":nn.ReLU6(True),"ELU":nn.ELU(True),"Hardswish":nn.Hardswish(),"PReLU":nn.PReLU(),"Tanh":nn.Tanh(),"Sigmoid":nn.Sigmoid()}.get(name, nn.ReLU(True))
@@ -256,7 +314,7 @@ ${lines.join("\n") || '            ("identity", nn.Identity()),'}
             skip = skip[:, :x.shape[1]]
         return skip
 
-${genTransforms(dataset, augs)}
+${genTransforms(dataset, augs, filterConfig)}
 
 DATASET_NAME = "${dataset.name}"
 MODEL_INPUT = (${dataset.shape[2]}, ${dataset.shape[0]}, ${dataset.shape[1]})
@@ -267,7 +325,7 @@ ${trainLoopCode}
 `;
 }
 
-function genTransforms(ds, augs) {
+function genTransforms(ds, augs, filterConfig="None") {
   const [h, w] = ds.shape, l = [];
   if (augs.includes("Resize")) l.push(`    transforms.Resize((${h}, ${w})),`);
   if (augs.includes("RandomResizedCrop")) l.push(`    transforms.RandomResizedCrop(${Math.max(h, w)}),`);
@@ -281,16 +339,56 @@ function genTransforms(ds, augs) {
   l.push("    transforms.ToTensor(),");
   if (augs.includes("Normalize")) l.push("    transforms.Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),");
   if (augs.includes("RandomErasing")) l.push("    transforms.RandomErasing(p=0.25),");
-  return `train_transforms = transforms.Compose([\n${l.join("\n")}\n])\nUSE_MIXUP = ${augs.includes("MixUp")}\nUSE_CUTMIX = ${augs.includes("CutMix")}`;
+  
+  if (filterConfig === "Sobel") l.push(`    transforms.Lambda(lambda x: filter_sobel(x)),`);
+  else if (filterConfig === "Gaussian") l.push(`    transforms.GaussianBlur(kernel_size=5, sigma=(1.0, 2.0)),`);
+  else if (filterConfig === "Laplace") l.push(`    transforms.Lambda(lambda x: filter_laplace(x)),`);
+  else if (filterConfig === "Canny") l.push(`    transforms.Lambda(lambda x: filter_canny(x)),`);
+  else if (filterConfig === "Median") l.push(`    transforms.Lambda(lambda x: filter_median(x)),`);
+  
+  let filterImports = "";
+  if (["Sobel", "Laplace", "Canny", "Median"].includes(filterConfig)) {
+      filterImports = `import cv2\nimport numpy as np\n
+def filter_sobel(tensor):
+    img = tensor.numpy().transpose(1,2,0)
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) if img.shape[-1] == 3 else img
+    grad_x = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+    grad_y = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+    mag = cv2.magnitude(grad_x, grad_y)
+    mag = np.expand_dims(mag, axis=2) if img.shape[-1] == 3 else mag
+    return torch.from_numpy(mag.transpose(2,0,1))
+
+def filter_laplace(tensor):
+    img = tensor.numpy().transpose(1,2,0)
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) if img.shape[-1] == 3 else img
+    dst = cv2.Laplacian(gray, cv2.CV_32F, ksize=3)
+    dst = np.expand_dims(dst, axis=2) if img.shape[-1] == 3 else dst
+    return torch.from_numpy(dst.transpose(2,0,1))
+
+def filter_canny(tensor):
+    img = (tensor.numpy().transpose(1,2,0) * 255).astype(np.uint8)
+    edges = cv2.Canny(img, 100, 200)
+    edges = np.expand_dims(edges, axis=2) if img.shape[-1] == 3 else edges
+    return torch.from_numpy((edges.astype(np.float32)/255.0).transpose(2,0,1))
+
+def filter_median(tensor):
+    img = (tensor.numpy().transpose(1,2,0) * 255).astype(np.uint8)
+    dst = cv2.medianBlur(img, 5)
+    dst = np.expand_dims(dst, axis=2) if len(dst.shape) == 2 else dst
+    return torch.from_numpy((dst.astype(np.float32)/255.0).transpose(2,0,1))
+`;
+  }
+  
+  return `${filterImports}\ntrain_transforms = transforms.Compose([\n${l.join("\n")}\n])\nUSE_MIXUP = ${augs.includes("MixUp")}\nUSE_CUTMIX = ${augs.includes("CutMix")}`;
 }
 
 function generateLossExpr(cfg) {
   const p = cfg.params || {};
-  const m = { cross_entropy: `nn.CrossEntropyLoss(label_smoothing=${p.label_smoothing || 0.0})`, bce: "nn.BCEWithLogitsLoss()", focal: `FocalLoss(alpha=${p.alpha || 0.25}, gamma=${p.gamma || 2.0})`, mse: "nn.MSELoss()", l1: "nn.L1Loss()", smooth_l1: `nn.SmoothL1Loss(beta=${p.beta || 1.0})`, kl_div: "nn.KLDivLoss(reduction='batchmean')", triplet: `nn.TripletMarginLoss(margin=${p.margin || 1.0})`, contrastive: `ContrastiveLoss(margin=${p.margin || 1.0})`, cosine_embed: `nn.CosineEmbeddingLoss(margin=${p.margin || 0.0})`, dice: `DiceLoss(smooth=${p.smooth || 1.0})`, bce_dice: `BCEDiceLoss(bce_weight=${p.bce_weight || 0.5})`, tversky: `TverskyLoss(alpha=${p.alpha || 0.3}, beta=${p.beta || 0.7})`, lovasz: "LovaszSoftmaxLoss()", boundary: "BoundaryLoss()", hausdorff: "HausdorffLoss()", ctc: `nn.CTCLoss(blank=${p.blank || 0})` };
+  const m = { cross_entropy: `nn.CrossEntropyLoss(label_smoothing=${p.label_smoothing || 0.0})`, bce: "nn.BCEWithLogitsLoss()", focal: `FocalLoss(alpha=${p.alpha || 0.25}, gamma=${p.gamma || 2.0})`, mse: "nn.MSELoss()", l1: "nn.L1Loss()", smooth_l1: `nn.SmoothL1Loss(beta=${p.beta || 1.0})`, kl_div: "nn.KLDivLoss(reduction='batchmean')", triplet: `nn.TripletMarginLoss(margin=${p.margin || 1.0})`, contrastive: `ContrastiveLoss(margin=${p.margin || 1.0})`, cosine_embed: `nn.CosineEmbeddingLoss(margin=${p.margin || 0.0})`, dice: `DiceLoss(smooth=${p.smooth || 1.0})`, iou: `JaccardLoss(smooth=${p.smooth || 1.0})`, bce_dice: `BCEDiceLoss(bce_weight=${p.bce_weight || 0.5})`, tversky: `TverskyLoss(alpha=${p.alpha || 0.3}, beta=${p.beta || 0.7})`, lovasz: "LovaszSoftmaxLoss()", boundary: "BoundaryLoss()", hausdorff: "HausdorffLoss()", ctc: `nn.CTCLoss(blank=${p.blank || 0})` };
   return m[cfg.kind] || "nn.CrossEntropyLoss()";
 }
 
-export function generateTransformerCode(graph, dataset, augs, lossConfig, trainSettings) {
+export function generateTransformerCode(graph, dataset, augs, lossConfig, trainSettings, filterConfig="None") {
   const lines = []; let dim = 768, li = 0;
   graph.forEach(b => {
     const p = b.params; if (b.kind === "t_input") return;
@@ -327,7 +425,7 @@ ${lines.join("\n") || '            ("identity", nn.Identity()),'}
     def forward(self, x):
         return self.blocks(x)
 
-${genTransforms(dataset, augs)}
+${genTransforms(dataset, augs, filterConfig)}
 DATASET_NAME = "${dataset.name}"
 MODEL_INPUT = (${dataset.shape[2]}, ${dataset.shape[0]}, ${dataset.shape[1]})
 ${lossLine}
@@ -337,13 +435,41 @@ ${trainLoopCode}
 `;
 }
 
-export function generateUnetCode(graph, dataset, augs, lossConfig, trainSettings) {
+export function generateUnetCode(graph, dataset, augs, lossConfig, trainSettings, filterConfig="None") {
+  let variant = graph.find(b => ["unet_pp", "resunet", "transunet", "wnet", "vnet"].includes(b.kind));
+  if (variant) {
+       const lossLine = lossConfig ? `\ncriterion = ${generateLossExpr(lossConfig)}` : "";
+       const trainLoopCode = generatePyTorchTrainingLoop("unet", trainSettings, dataset);
+       return `import torch, torch.nn as nn
+from torchvision import transforms
+
+# Instantiating ${variant.label}
+class CustomUNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = ${variant.kind.toUpperCase()}Model(in_channels=${dataset.shape[2]}, num_classes=${dataset.classes || 2})
+    def forward(self, x):
+        return self.model(x)
+
+${genTransforms(dataset, augs, filterConfig)}
+DATASET_NAME = "${dataset.name}"
+MODEL_INPUT = (${dataset.shape[2]}, ${dataset.shape[0]}, ${dataset.shape[1]})
+${lossLine}
+model = CustomUNet()
+print(f"Parameters: {sum(p.numel() for p in model.parameters()):,}")
+${trainLoopCode}
+`;
+  }
+
   const enc = [], dec = [], bot = [], head = []; let c = dataset.shape[2];
   graph.forEach(b => {
     const p = b.params;
     if (b.kind === "u_input") return;
     if (b.kind.startsWith("u_enc")) { enc.push(`        self.enc${enc.length} = EncoderBlock(${c}, ${p.out}, activation=${Q(p.activation || "ReLU")})`); c = Number(p.out); }
-    else if (["u_bottleneck", "u_aspp_bridge"].includes(b.kind)) { bot.push(`        self.bottleneck = BottleneckBridge(${c}, ${p.out}, activation=${Q(p.activation || "ReLU")})`); c = Number(p.out); }
+    else if (["u_bottleneck", "u_aspp_bridge", "dense_bottleneck", "attn_bottleneck"].includes(b.kind)) { 
+        let clsName = b.kind === "dense_bottleneck" ? "DenseBottleneck" : b.kind === "attn_bottleneck" ? "AttentionBottleneck" : b.kind === "u_aspp_bridge" ? "ASPPBridge" : "BottleneckBridge";
+        bot.push(`        self.bottleneck = ${clsName}(${c}, ${p.out}, activation=${Q(p.activation || "ReLU")})`); c = Number(p.out); 
+    }
     else if (b.kind.startsWith("u_dec")) { dec.push(`        self.dec${dec.length} = DecoderBlock(${c}, ${p.out}, activation=${Q(p.activation || "ReLU")})`); c = Number(p.out); }
     else if (b.kind === "u_seg_head") { head.push(`        self.seg_head = nn.Conv2d(${c}, ${p.classes}, 1)`); }
     else if (b.kind === "u_attn_gate") { head.push(`        self.attn_gate = AttentionGate(${p.channels || c})`); }
@@ -370,7 +496,7 @@ ${dec.map((_, i) => `        x = self.dec${i}(x, skips[${enc.length - 1 - i}] if
 ${head.length ? `        x = self.seg_head(x)` : "        pass"}
         return x
 
-${genTransforms(dataset, augs)}
+${genTransforms(dataset, augs, filterConfig)}
 DATASET_NAME = "${dataset.name}"
 MODEL_INPUT = (${dataset.shape[2]}, ${dataset.shape[0]}, ${dataset.shape[1]})
 ${lossLine}

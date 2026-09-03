@@ -5,7 +5,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 import { cnnCatalog, transformerCatalog, unetCatalog, mlCatalog, lossCatalog, activations } from "./data/catalogs.js";
-import { imageDatasets, csvDatasets, augmentations } from "./data/datasets.js";
+import { imageDatasets, csvDatasets, augmentations, imageFilters } from "./data/datasets.js";
 import { calculateShapes } from "./utils/shapeCalc.js";
 import { validateArchitecture, issueMap } from "./utils/validation.js";
 import { generateTorchCode, generateTransformerCode, generateUnetCode, generateSklearnCode } from "./utils/codeGen.js";
@@ -50,6 +50,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(graphs.cnn[0]?.id || null);
   const [dataset, setDataset] = useState(initialData);
   const [selectedAugs, setSelectedAugs] = useState(["Resize", "HorizontalFlip", "Normalize"]);
+  const [selectedFilter, setSelectedFilter] = useState("None");
   const [toast, setToast] = useState("");
   
   const [seqPaths, setSeqPaths] = useState([]);
@@ -72,11 +73,11 @@ export default function App() {
   const issues = useMemo(() => issueMap(validation), [validation]);
   
   const generatedCode = useMemo(() => {
-    if (mode === "cnn") return generateTorchCode(graph, dataset, selectedAugs, losses.cnn, trainSettings);
-    if (mode === "transformer") return generateTransformerCode(graph, dataset, selectedAugs, losses.transformer, trainSettings);
-    if (mode === "unet") return generateUnetCode(graph, dataset, selectedAugs, losses.unet, trainSettings);
+    if (mode === "cnn") return generateTorchCode(graph, dataset, selectedAugs, losses.cnn, trainSettings, selectedFilter);
+    if (mode === "transformer") return generateTransformerCode(graph, dataset, selectedAugs, losses.transformer, trainSettings, selectedFilter);
+    if (mode === "unet") return generateUnetCode(graph, dataset, selectedAugs, losses.unet, trainSettings, selectedFilter);
     return generateSklearnCode(graph, losses.ml, trainSettings);
-  }, [mode, graph, dataset, selectedAugs, losses, trainSettings]);
+  }, [mode, graph, dataset, selectedAugs, losses, trainSettings, selectedFilter]);
 
   const selected = graph.find(b => b.id === selectedId);
 
@@ -399,10 +400,7 @@ export default function App() {
               <div className="scroll">
                 <h2>Compatible Datasets</h2>
                 <div className="tabs" style={{marginBottom:16, overflowX:'auto', whiteSpace:'nowrap'}}>
-                  {(mode === "ml" 
-                    ? ["All", "Classification", "Regression"]
-                    : ["All", "Cervical Cancer", "Skin Cancer", "Blood Classifications", "Brain Tumor", "Breast Cancer", "Chest XRay", "Other Medical", "Natural Benchmarks"]
-                  ).map(t => (
+                  {["All", ...new Set((mode === "ml" ? csvDatasets : imageDatasets).filter(d => d.compatible.includes(mode)).map(d => d.category))].map(t => (
                     <button key={t} className={dataFilter === t ? "active" : ""} onClick={()=>setDataFilter(t)}>{t}</button>
                   ))}
                 </div>
@@ -420,6 +418,12 @@ export default function App() {
                     <div className="check-grid">
                       {augmentations.map(a => (
                         <label key={a} className="check"><input type="checkbox" checked={selectedAugs.includes(a)} onChange={() => setSelectedAugs(p => p.includes(a)?p.filter(x=>x!==a):[...p,a])}/> {a}</label>
+                      ))}
+                    </div>
+                    <h2 style={{marginTop: 24}}>Image Filters (Only one selectable)</h2>
+                    <div className="check-grid">
+                      {imageFilters.map(f => (
+                        <label key={f} className="check"><input type="radio" name="imageFilter" checked={selectedFilter === f} onChange={() => setSelectedFilter(f)}/> {f}</label>
                       ))}
                     </div>
                   </div>
@@ -448,8 +452,8 @@ export default function App() {
                   <div>
                     <h2>Visualizations & Tracking</h2>
                     <div className="form-grid" style={{gridTemplateColumns:'1fr'}}>
-                      {["plot_loss", "confusion_matrix", "tsne", "gradcam"].map(v => (
-                         <label key={v} className="check"><input type="checkbox" checked={trainSettings.visualizations.includes(v)} onChange={()=>setTrainSettings(p=>({...p, visualizations: p.visualizations.includes(v)?p.visualizations.filter(x=>x!==v):[...p.visualizations, v]}))} /> Generate {v.replace("_"," ")} Code</label>
+                      {(mode === "unet" ? ["plot_loss", "mask_overlay", "iou_trend", "prediction_samples"] : ["plot_loss", "confusion_matrix", "tsne", "gradcam"]).map(v => (
+                         <label key={v} className="check"><input type="checkbox" checked={trainSettings.visualizations.includes(v)} onChange={()=>setTrainSettings(p=>({...p, visualizations: p.visualizations.includes(v)?p.visualizations.filter(x=>x!==v):[...p.visualizations, v]}))} /> Generate {v.replace(/_/g," ")} Code</label>
                       ))}
                     </div>
                   </div>
