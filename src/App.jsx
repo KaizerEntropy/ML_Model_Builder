@@ -302,10 +302,10 @@ export default function App() {
               </div>
             </div>
             <div className="mode-switch">
-              <button className={mode === "cnn" ? "active" : ""} onClick={() => {setMode("cnn"); setDataset(imageDatasets[0]);}}><BrainCircuit size={14}/> CNN</button>
-              <button className={mode === "transformer" ? "active" : ""} onClick={() => {setMode("transformer"); setDataset(imageDatasets[0]);}}><Box size={14}/> ViT</button>
-              <button className={mode === "unet" ? "active" : ""} onClick={() => {setMode("unet"); setDataset(imageDatasets[0]);}}><GitBranch size={14}/> U-Net</button>
-              <button className={mode === "ml" ? "active" : ""} onClick={() => {setMode("ml"); setDataset(csvDatasets[0]);}}><Bot size={14}/> ML</button>
+              <button className={mode === "cnn" ? "active" : ""} onClick={() => {setMode("cnn"); setDataset(imageDatasets[0]); setDataFilter("All");}}><BrainCircuit size={14}/> CNN</button>
+              <button className={mode === "transformer" ? "active" : ""} onClick={() => {setMode("transformer"); setDataset(imageDatasets[0]); setDataFilter("All");}}><Box size={14}/> ViT</button>
+              <button className={mode === "unet" ? "active" : ""} onClick={() => {setMode("unet"); setDataset(imageDatasets[0]); setDataFilter("All");}}><GitBranch size={14}/> U-Net</button>
+              <button className={mode === "ml" ? "active" : ""} onClick={() => {setMode("ml"); setDataset(csvDatasets[0]); setDataFilter("All");}}><Bot size={14}/> ML</button>
             </div>
             <label className="search-row"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search library..."/></label>
             <div className="scroll">
@@ -399,7 +399,10 @@ export default function App() {
               <div className="scroll">
                 <h2>Compatible Datasets</h2>
                 <div className="tabs" style={{marginBottom:16, overflowX:'auto', whiteSpace:'nowrap'}}>
-                  {["All", "Cervical Cancer", "Skin Cancer", "Blood Classifications", "Brain Tumor", "Breast Cancer", "Natural Benchmarks", "Classical ML"].map(t => (
+                  {(mode === "ml" 
+                    ? ["All", "Classification", "Regression"]
+                    : ["All", "Cervical Cancer", "Skin Cancer", "Blood Classifications", "Brain Tumor", "Breast Cancer", "Chest XRay", "Other Medical", "Natural Benchmarks"]
+                  ).map(t => (
                     <button key={t} className={dataFilter === t ? "active" : ""} onClick={()=>setDataFilter(t)}>{t}</button>
                   ))}
                 </div>
