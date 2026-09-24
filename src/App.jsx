@@ -10,6 +10,7 @@ import { imageDatasets, csvDatasets, augmentations, imageFilters } from "./data/
 import { calculateShapes } from "./utils/shapeCalc.js";
 import { validateArchitecture, issueMap } from "./utils/validation.js";
 import { generateTorchCode, generateTransformerCode, generateUnetCode, generateSklearnCode, generateODCode } from "./utils/codeGen.js";
+import VisualTab from "./components/VisualTab.jsx";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 function cloneBlock(template) { return { id: uid(), kind: template.kind, label: template.label, glyph: template.glyph, params: structuredClone(template.params || {}), attention: [] }; }
@@ -293,7 +294,7 @@ export default function App() {
           <div><h1>Model Forge</h1><p>Visual Architecture Builder • IDE Gen</p></div>
         </div>
         <nav className="tabs">
-          {["builder", "data", "training", "code"].map(item => (
+          {["builder", "visual", "data", "training", "code"].map(item => (
             <button key={item} className={view === item ? "active" : ""} onClick={() => setView(item)}>{item}</button>
           ))}
         </nav>
@@ -536,6 +537,10 @@ export default function App() {
                     {generatedCode}
                   </SyntaxHighlighter>
                </div>
+            )}
+            
+            {view === "visual" && (
+              <VisualTab graph={graph} shapes={shapes} />
             )}
           </section>
         )}
