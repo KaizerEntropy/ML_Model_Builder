@@ -84,7 +84,7 @@ export default function VisualTab({ graph, shapes }) {
         <h2>Interactive Model Execution</h2>
         <div className="controls">
           <button className="icon-btn" onClick={goPrev} disabled={currentStep === 0}><ChevronLeft size={18} /></button>
-          <button className="icon-btn primary" onClick={() => setIsPlaying(!isPlaying)}>
+          <button className="icon-btn play-btn" onClick={() => setIsPlaying(!isPlaying)}>
             {isPlaying ? <Pause size={18} /> : <Play size={18} />}
           </button>
           <button className="icon-btn" onClick={goNext} disabled={currentStep === graph.length - 1}><ChevronRight size={18} /></button>

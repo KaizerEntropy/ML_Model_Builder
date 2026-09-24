@@ -315,8 +315,8 @@ export default function App() {
             <div className="panel-header">
               <div><span>Library</span><strong>{mode.toUpperCase()} Blocks</strong></div>
               <div className="actions">
-                <button onClick={() => setGraphs(p=>({...p,[mode]:makePreset(mode, dataset)}))}><Sparkles size={14} /> Preset</button>
-                <button onClick={() => setLeftOpen(false)}><ChevronLeft size={14}/></button>
+                <button className="text-btn" onClick={() => setGraphs(p=>({...p,[mode]:makePreset(mode, dataset)}))}><Sparkles size={14} /> Preset</button>
+                <button className="icon-btn mini" onClick={() => setLeftOpen(false)}><ChevronLeft size={14}/></button>
               </div>
             </div>
             <div className="mode-switch">
@@ -549,7 +549,7 @@ export default function App() {
           rightOpen ? (
             <aside className="panel inspector-panel">
               <div className="panel-header">
-                <button onClick={() => setRightOpen(false)}><ChevronRight size={14}/></button>
+                <button className="icon-btn mini" onClick={() => setRightOpen(false)}><ChevronRight size={14}/></button>
                 <div><span>Inspector</span><strong>Block Settings</strong></div>
               </div>
               <div className="inspector-scroll scroll">
