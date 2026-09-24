@@ -1,13 +1,16 @@
-export const activations = ["ReLU","GELU","SiLU","Mish","LeakyReLU","ReLU6","ELU","Hardswish","PReLU","Tanh","Sigmoid"];
-export const attentionKinds = new Set(["se","cbam","eca","coordattn","selfattn","gca"]);
-export const residualKinds = new Set(["resnet","resnet_bottleneck","resnext"]);
-export const convLikeKinds = new Set(["conv","conv1x1","conv5x5","dilated","depthwise","grouped","bottleneck","inception","aspp","convnext","resnet","resnet_bottleneck","resnext","mobilenet","efficientnet","fusedmb","shuffle","dense","transpose_conv"]);
+export const activations = ["ReLU","GELU","SiLU","Mish","LeakyReLU","ReLU6","ELU","Hardswish","PReLU","Tanh","Sigmoid","SELU","Softplus","CELU","GLU","Swish"];
+export const attentionKinds = new Set(["se","cbam","eca","coordattn","selfattn","gca","spatialattn","ccattn","nonlocal"]);
+export const residualKinds = new Set(["resnet","resnet_bottleneck","resnext","wide_resnet","resnest"]);
+export const convLikeKinds = new Set(["conv","conv1x1","conv3x3","conv5x5","conv7x7","dilated","depthwise","grouped","bottleneck","inception","aspp","convnext","resnet","resnet_bottleneck","resnext","mobilenet","efficientnet","fusedmb","shuffle","dense","transpose_conv","ghost","squeezenet","darknet"]);
 
 export const cnnCatalog = [
   {group:"Input",kind:"input",label:"Input Tensor",glyph:"IN",meta:"image size & channels",params:{h:224,w:224,c:3}},
+  
   {group:"Convolution",kind:"conv",label:"Conv-BN-Act",glyph:"CV",meta:"standard CNN block",params:{out:32,kernel:3,stride:1,padding:1,dilation:1,activation:"ReLU"}},
   {group:"Convolution",kind:"conv1x1",label:"Pointwise 1×1",glyph:"1X",meta:"channel projection",params:{out:64,activation:"ReLU"}},
+  {group:"Convolution",kind:"conv3x3",label:"Standard 3×3",glyph:"3X",meta:"standard receptive field",params:{out:64,stride:1,activation:"ReLU"}},
   {group:"Convolution",kind:"conv5x5",label:"Wide Conv 5×5",glyph:"5X",meta:"larger receptive field",params:{out:64,stride:1,activation:"GELU"}},
+  {group:"Convolution",kind:"conv7x7",label:"Large Conv 7×7",glyph:"7X",meta:"very large receptive field",params:{out:64,stride:2,activation:"ReLU"}},
   {group:"Convolution",kind:"dilated",label:"Dilated Conv",glyph:"DL",meta:"expanded context",params:{out:64,kernel:3,dilation:2,activation:"ReLU"}},
   {group:"Convolution",kind:"depthwise",label:"Depthwise Separable",glyph:"DW",meta:"MobileNet-style",params:{out:64,kernel:3,stride:1,activation:"ReLU6"}},
   {group:"Convolution",kind:"grouped",label:"Grouped Conv",glyph:"GR",meta:"grouped channels",params:{out:96,groups:4,kernel:3,stride:1,activation:"ReLU"}},
@@ -15,24 +18,42 @@ export const cnnCatalog = [
   {group:"Convolution",kind:"inception",label:"Inception Block",glyph:"IC",meta:"multi-branch",params:{out:128,activation:"ReLU"}},
   {group:"Convolution",kind:"aspp",label:"ASPP Block",glyph:"AS",meta:"multi-rate dilation",params:{out:128,activation:"ReLU"}},
   {group:"Convolution",kind:"convnext",label:"ConvNeXt Block",glyph:"CN",meta:"large-kernel modern",params:{out:96,kernel:7,activation:"GELU"}},
+  {group:"Convolution",kind:"ghost",label:"Ghost Module",glyph:"GH",meta:"cheap operations",params:{out:64,ratio:2,activation:"ReLU"}},
+  
   {group:"ResNet Models",kind:"resnet",label:"ResNet Basic Block",glyph:"RS",meta:"skip connection",params:{out:64,stride:1,activation:"ReLU",skipTo:""}},
   {group:"ResNet Models",kind:"resnet_bottleneck",label:"ResNet Bottleneck",glyph:"RB",meta:"deep residual",params:{out:128,bottleneck:32,stride:1,activation:"ReLU",skipTo:""}},
-  {group:"ResNet Models",kind:"resnext",label:"ResNeXt Block",glyph:"RX",meta:"cardinality groups",params:{out:128,cardinality:8,stride:1,activation:"ReLU",skipTo:""}},
+  {group:"ResNet Models",kind:"resnext",label:"ResNeXt Block",glyph:"RX",meta:"cardinality groups",params:{out:128,cardinality:32,stride:1,activation:"ReLU",skipTo:""}},
+  {group:"ResNet Models",kind:"wide_resnet",label:"Wide ResNet Block",glyph:"WR",meta:"wider channels",params:{out:128,width_factor:2,stride:1,activation:"ReLU",skipTo:""}},
+  {group:"ResNet Models",kind:"resnest",label:"ResNeSt Block",glyph:"RN",meta:"split-attention",params:{out:128,radix:2,cardinality:1,stride:1,activation:"ReLU",skipTo:""}},
   {group:"ResNet Models",kind:"resnet18",label:"ResNet-18 Full",glyph:"R18",meta:"pretrained full network",params:{pretrained:true}},
   {group:"ResNet Models",kind:"resnet34",label:"ResNet-34 Full",glyph:"R34",meta:"pretrained full network",params:{pretrained:true}},
   {group:"ResNet Models",kind:"resnet50",label:"ResNet-50 Full",glyph:"R50",meta:"pretrained full network",params:{pretrained:true}},
+  {group:"ResNet Models",kind:"resnet101",label:"ResNet-101 Full",glyph:"R101",meta:"pretrained full network",params:{pretrained:true}},
+  {group:"ResNet Models",kind:"resnext50",label:"ResNeXt-50 Full",glyph:"RX5",meta:"pretrained full network",params:{pretrained:true}},
+  
   {group:"MobileNet Models",kind:"mobilenet",label:"Inverted Residual",glyph:"IR",meta:"MobileNetV2 Block",params:{out:64,expansion:6,stride:1,activation:"ReLU6"}},
+  {group:"MobileNet Models",kind:"mobilenet_v3_bneck",label:"MobileNetV3 Block",glyph:"M3B",meta:"with SE module",params:{out:64,expansion:6,kernel:5,stride:1,se:true,activation:"Hardswish"}},
   {group:"MobileNet Models",kind:"mobilenet_v2",label:"MobileNetV2 Full",glyph:"MV2",meta:"pretrained full network",params:{pretrained:true}},
-  {group:"MobileNet Models",kind:"mobilenet_v3",label:"MobileNetV3 Full",glyph:"MV3",meta:"pretrained full network",params:{pretrained:true}},
+  {group:"MobileNet Models",kind:"mobilenet_v3_small",label:"MobileNetV3 Small",glyph:"MV3S",meta:"pretrained full network",params:{pretrained:true}},
+  {group:"MobileNet Models",kind:"mobilenet_v3_large",label:"MobileNetV3 Large",glyph:"MV3L",meta:"pretrained full network",params:{pretrained:true}},
+  
   {group:"EfficientNet Models",kind:"efficientnet",label:"MBConv Block",glyph:"MB",meta:"EfficientNet Block",params:{out:96,expansion:4,kernel:3,stride:1,se_ratio:0.25,activation:"SiLU"}},
   {group:"EfficientNet Models",kind:"fusedmb",label:"Fused MBConv Block",glyph:"FM",meta:"EfficientNetV2 Block",params:{out:96,expansion:4,stride:1,activation:"SiLU"}},
   {group:"EfficientNet Models",kind:"efficientnet_b0",label:"EfficientNet-B0 Full",glyph:"EB0",meta:"pretrained full network",params:{pretrained:true}},
+  {group:"EfficientNet Models",kind:"efficientnet_b2",label:"EfficientNet-B2 Full",glyph:"EB2",meta:"pretrained full network",params:{pretrained:true}},
   {group:"EfficientNet Models",kind:"efficientnet_b4",label:"EfficientNet-B4 Full",glyph:"EB4",meta:"pretrained full network",params:{pretrained:true}},
   {group:"EfficientNet Models",kind:"efficientnet_b7",label:"EfficientNet-B7 Full",glyph:"EB7",meta:"pretrained full network",params:{pretrained:true}},
-  {group:"EfficientNet Models",kind:"shuffle",label:"ShuffleNet Unit",glyph:"SH",meta:"channel shuffle",params:{out:96,groups:2,stride:1,activation:"ReLU"}},
-  {group:"DenseNet Models",kind:"dense",label:"Dense Block",glyph:"DN",meta:"growth connections",params:{growth:16,layers:3,activation:"ReLU"}},
+  {group:"EfficientNet Models",kind:"efficientnet_v2_s",label:"EfficientNetV2-S",glyph:"EV2S",meta:"pretrained full network",params:{pretrained:true}},
+  
+  {group:"DenseNet Models",kind:"dense",label:"Dense Block",glyph:"DN",meta:"growth connections",params:{growth:32,layers:4,activation:"ReLU"}},
+  {group:"DenseNet Models",kind:"dense_transition",label:"Transition Layer",glyph:"TR",meta:"pool and compress",params:{compression:0.5,activation:"ReLU"}},
   {group:"DenseNet Models",kind:"densenet121",label:"DenseNet-121 Full",glyph:"D21",meta:"pretrained full network",params:{pretrained:true}},
   {group:"DenseNet Models",kind:"densenet169",label:"DenseNet-169 Full",glyph:"D69",meta:"pretrained full network",params:{pretrained:true}},
+  {group:"DenseNet Models",kind:"densenet201",label:"DenseNet-201 Full",glyph:"D01",meta:"pretrained full network",params:{pretrained:true}},
+  
+  {group:"Other Models",kind:"squeezenet",label:"Fire Module",glyph:"FI",meta:"SqueezeNet block",params:{squeeze:16,expand1x1:64,expand3x3:64,activation:"ReLU"}},
+  {group:"Other Models",kind:"darknet",label:"Darknet Block",glyph:"DK",meta:"YOLO base block",params:{out:64,activation:"LeakyReLU"}},
+  
   {group:"Attention Modules",kind:"se",label:"SE Attention",glyph:"SE",meta:"squeeze & excite",params:{ratio:16}},
   {group:"Attention Modules",kind:"cbam",label:"CBAM",glyph:"CB",meta:"channel+spatial",params:{ratio:16}},
   {group:"Attention Modules",kind:"eca",label:"ECA",glyph:"EC",meta:"efficient channel",params:{kernel:3}},
@@ -41,21 +62,32 @@ export const cnnCatalog = [
   {group:"Attention Modules",kind:"gca",label:"Global Context",glyph:"GC",meta:"GC-Net",params:{ratio:16}},
   {group:"Attention Modules",kind:"spatialattn",label:"Spatial Attention",glyph:"SA",meta:"spatial focus",params:{kernel:7}},
   {group:"Attention Modules",kind:"ccattn",label:"Criss-Cross Attn",glyph:"CC",meta:"CCNet",params:{}},
+  {group:"Attention Modules",kind:"nonlocal",label:"Non-Local Block",glyph:"NL",meta:"long-range dependency",params:{}},
+  
   {group:"Activation",kind:"activation",label:"Activation Fn",glyph:"AF",meta:"standalone",params:{activation:"ReLU"}},
+  
   {group:"Normalization",kind:"batchnorm",label:"BatchNorm2d",glyph:"B2",meta:"channel norm",params:{}},
   {group:"Normalization",kind:"groupnorm",label:"GroupNorm",glyph:"GN",meta:"small-batch",params:{groups:8}},
   {group:"Normalization",kind:"instancenorm",label:"InstanceNorm2d",glyph:"IS",meta:"style-robust",params:{}},
   {group:"Normalization",kind:"layernorm",label:"LayerNorm",glyph:"LN",meta:"transformer-style",params:{}},
+  
   {group:"Pooling",kind:"pool",label:"Max Pool",glyph:"MP",meta:"downsample",params:{mode:"MaxPool2d",kernel:2,stride:2}},
   {group:"Pooling",kind:"avgpool",label:"Average Pool",glyph:"AP",meta:"smooth downsample",params:{kernel:2,stride:2}},
   {group:"Pooling",kind:"adapool",label:"Adaptive Pool",glyph:"AD",meta:"target H×W",params:{mode:"AdaptiveAvgPool2d",h:1,w:1}},
+  {group:"Pooling",kind:"lp_pool",label:"Lp Pool",glyph:"LP",meta:"power norm pool",params:{norm_type:2,kernel:2,stride:2}},
+  {group:"Pooling",kind:"stochastic_pool",label:"Stochastic Pool",glyph:"ST",meta:"probabilistic downsample",params:{kernel:2,stride:2}},
   {group:"Pooling",kind:"gem",label:"GeM Pool",glyph:"GM",meta:"learnable p",params:{p:3}},
   {group:"Pooling",kind:"spp",label:"Spatial Pyramid",glyph:"SP",meta:"multi-scale",params:{bins:"1,2,4"}},
+  
   {group:"Upsampling",kind:"upsample",label:"Upsample",glyph:"UP",meta:"nearest/bilinear",params:{scale:2,mode:"nearest"}},
   {group:"Upsampling",kind:"transpose_conv",label:"Transpose Conv",glyph:"TC",meta:"learnable upsample",params:{out:64,kernel:4,stride:2,padding:1,activation:"ReLU"}},
   {group:"Upsampling",kind:"pixelshuffle",label:"PixelShuffle",glyph:"PS",meta:"sub-pixel",params:{scale:2}},
+  {group:"Upsampling",kind:"carafe",label:"CARAFE",glyph:"CF",meta:"content-aware reassembly",params:{scale:2}},
+  
   {group:"Regularization",kind:"dropout",label:"Dropout",glyph:"DO",meta:"regularization",params:{p:0.25}},
   {group:"Regularization",kind:"dropout2d",label:"Dropout2d",glyph:"D2",meta:"spatial dropout",params:{p:0.1}},
+  {group:"Regularization",kind:"dropblock",label:"DropBlock",glyph:"DB",meta:"structured dropout",params:{p:0.1,block_size:7}},
+  
   {group:"Head",kind:"flatten",label:"Flatten",glyph:"FL",meta:"tensor→vector",params:{}},
   {group:"Head",kind:"gap",label:"Global Avg Pool",glyph:"GP",meta:"spatial squeeze",params:{}},
   {group:"Head",kind:"head",label:"Classifier Head",glyph:"HD",meta:"linear logits",params:{classes:10,hidden:128,dropout:0.2}},
@@ -66,21 +98,36 @@ export const transformerCatalog = [
   {group:"Embedding",kind:"patch_embed",label:"Patch Embedding",glyph:"PE",meta:"image→patches",params:{patch_size:16,embed_dim:768,img_size:224,in_channels:3}},
   {group:"Embedding",kind:"pos_embed",label:"Positional Encoding",glyph:"PO",meta:"sinusoidal/learned",params:{mode:"learned",max_len:512}},
   {group:"Embedding",kind:"cls_token",label:"CLS Token",glyph:"CL",meta:"classification token",params:{}},
+  {group:"Embedding",kind:"distill_token",label:"Distillation Token",glyph:"DI",meta:"DeiT distill token",params:{}},
+  
   {group:"Encoder",kind:"mha",label:"Multi-Head Attention",glyph:"MH",meta:"scaled dot-product",params:{heads:8,embed_dim:768,dropout:0.1}},
   {group:"Encoder",kind:"cross_attn",label:"Cross Attention",glyph:"XA",meta:"encoder-decoder",params:{heads:8,embed_dim:768,dropout:0.1}},
   {group:"Encoder",kind:"ffn",label:"Feed-Forward Network",glyph:"FF",meta:"MLP expansion",params:{embed_dim:768,hidden:3072,activation:"GELU",dropout:0.1}},
+  {group:"Encoder",kind:"glu",label:"GLU Variant FFN",glyph:"GL",meta:"Gated Linear Unit",params:{embed_dim:768,hidden:3072,activation:"Swish",dropout:0.1}},
   {group:"Encoder",kind:"transformer_block",label:"Transformer Block",glyph:"TB",meta:"MHA + FFN",params:{heads:8,embed_dim:768,hidden:3072,activation:"GELU",dropout:0.1}},
   {group:"Encoder",kind:"pre_norm",label:"Pre-Norm Layer",glyph:"PN",meta:"LayerNorm before",params:{embed_dim:768}},
+  
   {group:"Decoder",kind:"decoder_block",label:"Decoder Block",glyph:"DB",meta:"masked + cross attn",params:{heads:8,embed_dim:768,hidden:3072,activation:"GELU",dropout:0.1}},
   {group:"Decoder",kind:"masked_mha",label:"Masked MHA",glyph:"MM",meta:"causal attention",params:{heads:8,embed_dim:768,dropout:0.1}},
+  
   {group:"Normalization",kind:"t_layernorm",label:"LayerNorm",glyph:"LN",meta:"pre/post norm",params:{embed_dim:768}},
+  {group:"Normalization",kind:"rmsnorm",label:"RMSNorm",glyph:"RM",meta:"Llama-style norm",params:{embed_dim:768}},
+  
   {group:"Regularization",kind:"t_dropout",label:"Dropout",glyph:"DO",meta:"token dropout",params:{p:0.1}},
+  {group:"Regularization",kind:"stochastic_depth",label:"Stochastic Depth",glyph:"SD",meta:"drop path",params:{p:0.1}},
+  
   {group:"Pooling",kind:"t_cls_pool",label:"CLS Pooling",glyph:"CP",meta:"use [CLS] token",params:{}},
   {group:"Pooling",kind:"t_mean_pool",label:"Mean Pooling",glyph:"MP",meta:"avg all tokens",params:{}},
+  {group:"Pooling",kind:"t_max_pool",label:"Max Pooling",glyph:"MX",meta:"max over tokens",params:{}},
+  
   {group:"Head",kind:"t_head",label:"Classification Head",glyph:"HD",meta:"linear logits",params:{classes:10,hidden:256,dropout:0.1}},
+  
   {group:"Variant",kind:"vit_block",label:"ViT Block",glyph:"VT",meta:"Vision Transformer",params:{heads:12,embed_dim:768,hidden:3072,dropout:0.0}},
   {group:"Variant",kind:"swin_block",label:"Swin Block",glyph:"SW",meta:"shifted window",params:{heads:8,embed_dim:96,window_size:7}},
   {group:"Variant",kind:"deit_block",label:"DeiT Block",glyph:"DE",meta:"distillation token",params:{heads:12,embed_dim:768,hidden:3072}},
+  {group:"Variant",kind:"cait_block",label:"CaiT Block",glyph:"CT",meta:"class-attention",params:{heads:12,embed_dim:768,hidden:3072}},
+  {group:"Variant",kind:"pvt_block",label:"PVT Block",glyph:"PV",meta:"Pyramid Vision",params:{heads:8,embed_dim:64,reduction:4}},
+  {group:"Variant",kind:"coat_block",label:"CoaT Block",glyph:"CO",meta:"co-scale attention",params:{heads:8,embed_dim:64}},
 ];
 
 export const unetCatalog = [
@@ -89,20 +136,28 @@ export const unetCatalog = [
   {group:"Encoder",kind:"u_enc_res",label:"ResNet Encoder",glyph:"RE",meta:"residual encoder",params:{out:64,kernel:3,activation:"ReLU"}},
   {group:"Encoder",kind:"u_enc_dense",label:"Dense Encoder",glyph:"DE",meta:"dense encoder",params:{out:64,growth:16,layers:3}},
   {group:"Encoder",kind:"u_enc_attn",label:"Attention Encoder",glyph:"AE",meta:"encoder+SE/CBAM",params:{out:64,attn:"SE",activation:"ReLU"}},
+  {group:"Encoder",kind:"u_enc_mobilenet",label:"MobileNet Encoder",glyph:"ME",meta:"inverted residual",params:{out:64,expansion:6}},
+  {group:"Encoder",kind:"u_enc_efficient",label:"EfficientNet Encoder",glyph:"EE",meta:"MBConv encoder",params:{out:64,expansion:4}},
+  {group:"Encoder",kind:"u_enc_swin",label:"Swin Encoder Block",glyph:"SE",meta:"swin transformer",params:{out:96,heads:3}},
   {group:"Bottlenecks",kind:"u_bottleneck",label:"Standard Bottleneck",glyph:"BT",meta:"bridge encoder→decoder",params:{out:512,kernel:3,activation:"ReLU"}},
   {group:"Bottlenecks",kind:"u_aspp_bridge",label:"ASPP Bridge",glyph:"AB",meta:"multi-rate bridge",params:{out:512,activation:"ReLU"}},
   {group:"Bottlenecks",kind:"dense_bottleneck",label:"Dense Bottleneck",glyph:"DB",meta:"growth-based bridge",params:{out:512,growth:32,layers:4}},
   {group:"Bottlenecks",kind:"attn_bottleneck",label:"Attention Bottleneck",glyph:"TB",meta:"self-attention bridge",params:{out:512,heads:8}},
+  {group:"Bottlenecks",kind:"swin_bottleneck",label:"Swin Bottleneck",glyph:"SB",meta:"swin transformer bridge",params:{out:768,heads:8}},
   {group:"Decoder",kind:"u_dec",label:"Decoder Block",glyph:"DC",meta:"upsample+concat+conv",params:{out:64,kernel:3,activation:"ReLU"}},
   {group:"Decoder",kind:"u_dec_res",label:"ResNet Decoder",glyph:"RD",meta:"residual decoder",params:{out:64,kernel:3,activation:"ReLU"}},
   {group:"Decoder",kind:"u_dec_attn",label:"Attention Decoder",glyph:"AD",meta:"decoder+attention gate",params:{out:64,attn:"SE",activation:"ReLU"}},
+  {group:"Decoder",kind:"u_dec_dense",label:"Dense Decoder",glyph:"DD",meta:"dense decoder",params:{out:64,growth:16}},
+  {group:"Decoder",kind:"u_dec_swin",label:"Swin Decoder Block",glyph:"SD",meta:"swin transformer",params:{out:96,heads:3}},
   {group:"Skip Connection",kind:"u_skip",label:"Skip Connection",glyph:"SK",meta:"encoder→decoder",params:{mode:"concat"}},
   {group:"Skip Connection",kind:"u_attn_gate",label:"Attention Gate",glyph:"AG",meta:"filter skip features",params:{channels:64}},
+  {group:"Skip Connection",kind:"u_res_skip",label:"Residual Skip",glyph:"RS",meta:"residual connection",params:{channels:64}},
   {group:"Head",kind:"u_seg_head",label:"Segmentation Head",glyph:"SH",meta:"1×1 conv output",params:{classes:2,activation:"Sigmoid"}},
   {group:"Head",kind:"u_deep_sup",label:"Deep Supervision",glyph:"DS",meta:"multi-scale outputs",params:{classes:2}},
   {group:"UNet Variants",kind:"unet_pp",label:"UNet++ Block",glyph:"U+",meta:"nested skip paths",params:{out:64}},
   {group:"UNet Variants",kind:"resunet",label:"ResUNet Block",glyph:"RU",meta:"residual U-Net",params:{out:64,activation:"ReLU"}},
   {group:"UNet Variants",kind:"transunet",label:"TransUNet Block",glyph:"TU",meta:"transformer+UNet",params:{out:64,heads:8,embed_dim:768}},
+  {group:"UNet Variants",kind:"swinunet",label:"Swin-Unet Block",glyph:"SU",meta:"pure transformer unet",params:{out:96,heads:3}},
   {group:"UNet Variants",kind:"wnet",label:"WNet Full",glyph:"WN",meta:"dual unet cascading",params:{out:64}},
   {group:"UNet Variants",kind:"vnet",label:"VNet Full",glyph:"VN",meta:"3D to 2D variant",params:{out:64}},
 ];
@@ -110,16 +165,30 @@ export const unetCatalog = [
 export const mlCatalog = [
   {group:"Features",kind:"tabular_input",label:"Tabular Dataset",glyph:"TB",meta:"CSV features",params:{target:"label"}},
   {group:"Features",kind:"image_features",label:"Image Features",glyph:"IF",meta:"HOG/LBP/color",params:{method:"HOG"}},
+  {group:"Features",kind:"text_features",label:"Text Features",glyph:"TF",meta:"TF-IDF/BoW",params:{method:"TF-IDF",max_features:1000}},
+  {group:"Features",kind:"time_series",label:"Time Series",glyph:"TS",meta:"Temporal data",params:{window:7}},
+  
   {group:"Preprocessing",kind:"standard_scaler",label:"Standard Scaler",glyph:"SS",meta:"zero mean",params:{}},
   {group:"Preprocessing",kind:"minmax_scaler",label:"MinMax Scaler",glyph:"MM",meta:"range scaling",params:{}},
   {group:"Preprocessing",kind:"robust_scaler",label:"Robust Scaler",glyph:"RO",meta:"outlier-robust",params:{}},
+  {group:"Preprocessing",kind:"maxabs_scaler",label:"MaxAbs Scaler",glyph:"MA",meta:"sparse data scaling",params:{}},
+  {group:"Preprocessing",kind:"normalizer",label:"Normalizer",glyph:"NO",meta:"unit norm",params:{norm:"l2"}},
   {group:"Preprocessing",kind:"pca",label:"PCA",glyph:"PC",meta:"dim reduction",params:{components:64}},
+  {group:"Preprocessing",kind:"svd",label:"Truncated SVD",glyph:"SD",meta:"sparse dim reduction",params:{components:64}},
+  {group:"Preprocessing",kind:"lda",label:"LDA",glyph:"LD",meta:"linear discriminant",params:{components:2}},
+  {group:"Preprocessing",kind:"tsne",label:"t-SNE",glyph:"TN",meta:"manifold learning",params:{components:2,perplexity:30}},
   {group:"Preprocessing",kind:"label_encoder",label:"Label Encoder",glyph:"LE",meta:"encode target",params:{}},
   {group:"Preprocessing",kind:"onehot_encoder",label:"One-Hot Encoder",glyph:"OH",meta:"categorical",params:{}},
+  {group:"Preprocessing",kind:"ordinal_encoder",label:"Ordinal Encoder",glyph:"OE",meta:"ordered categorical",params:{}},
   {group:"Preprocessing",kind:"imputer",label:"Simple Imputer",glyph:"IM",meta:"missing values",params:{strategy:"mean"}},
+  {group:"Preprocessing",kind:"knn_imputer",label:"KNN Imputer",glyph:"KI",meta:"impute via neighbors",params:{n_neighbors:5}},
+  {group:"Preprocessing",kind:"poly_features",label:"Polynomial Features",glyph:"PF",meta:"interaction terms",params:{degree:2}},
+  
   {group:"Classifiers",kind:"random_forest",label:"Random Forest",glyph:"RF",meta:"bagged trees",params:{n_estimators:300,max_depth:12}},
   {group:"Classifiers",kind:"decision_tree",label:"Decision Tree",glyph:"DT",meta:"interpretable",params:{max_depth:8}},
   {group:"Classifiers",kind:"xgboost",label:"XGBoost",glyph:"XG",meta:"gradient boosting",params:{n_estimators:300,learning_rate:0.05,max_depth:5}},
+  {group:"Classifiers",kind:"lightgbm",label:"LightGBM",glyph:"LG",meta:"fast boosting",params:{n_estimators:300,learning_rate:0.05,num_leaves:31}},
+  {group:"Classifiers",kind:"catboost",label:"CatBoost",glyph:"CB",meta:"categorical boosting",params:{iterations:500,learning_rate:0.05,depth:6}},
   {group:"Classifiers",kind:"adaboost",label:"AdaBoost",glyph:"AB",meta:"boosted learners",params:{n_estimators:200,learning_rate:0.05}},
   {group:"Classifiers",kind:"logistic_regression",label:"Logistic Regression",glyph:"LR",meta:"linear classifier",params:{C:1.0,max_iter:1000}},
   {group:"Classifiers",kind:"svm",label:"SVM (SVC)",glyph:"SV",meta:"support vectors",params:{C:1.0,kernel:"rbf"}},
@@ -127,12 +196,18 @@ export const mlCatalog = [
   {group:"Classifiers",kind:"naive_bayes",label:"Naive Bayes",glyph:"NB",meta:"probabilistic",params:{}},
   {group:"Classifiers",kind:"gradient_boosting",label:"Gradient Boosting",glyph:"GB",meta:"sklearn boosting",params:{n_estimators:200,learning_rate:0.1,max_depth:5}},
   {group:"Classifiers",kind:"extra_trees",label:"Extra Trees",glyph:"ET",meta:"randomized trees",params:{n_estimators:300,max_depth:12}},
+  {group:"Classifiers",kind:"mlp_classifier",label:"MLP Classifier",glyph:"MC",meta:"neural network",params:{hidden_layer_sizes:"100,50",max_iter:500}},
+  
   {group:"Regressors",kind:"linear_regression",label:"Linear Regression",glyph:"LI",meta:"continuous",params:{}},
   {group:"Regressors",kind:"random_forest_regressor",label:"RF Regressor",glyph:"RR",meta:"tree regression",params:{n_estimators:300,max_depth:12}},
+  {group:"Regressors",kind:"xgboost_regressor",label:"XGBoost Regressor",glyph:"XR",meta:"boosted regression",params:{n_estimators:300,learning_rate:0.05,max_depth:5}},
+  {group:"Regressors",kind:"lightgbm_regressor",label:"LightGBM Reg",glyph:"LR",meta:"fast boosted regressor",params:{n_estimators:300,learning_rate:0.05}},
   {group:"Regressors",kind:"svr",label:"SVR",glyph:"SR",meta:"SV regression",params:{C:1.0,kernel:"rbf"}},
   {group:"Regressors",kind:"ridge",label:"Ridge",glyph:"RI",meta:"L2 regularized",params:{alpha:1.0}},
   {group:"Regressors",kind:"lasso",label:"Lasso",glyph:"LA",meta:"L1 regularized",params:{alpha:1.0}},
   {group:"Regressors",kind:"elastic_net",label:"Elastic Net",glyph:"EN",meta:"L1+L2",params:{alpha:1.0,l1_ratio:0.5}},
+  {group:"Regressors",kind:"knn_regressor",label:"KNN Regressor",glyph:"KR",meta:"instance-based",params:{n_neighbors:5}},
+  {group:"Regressors",kind:"mlp_regressor",label:"MLP Regressor",glyph:"MR",meta:"neural net regressor",params:{hidden_layer_sizes:"100,50",max_iter:500}},
 ];
 
 export const lossCatalog = {

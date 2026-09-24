@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Bot, BrainCircuit, Box, GitBranch, Copy, Download, Image as ImageIcon, Plus, Search, Sparkles, Trash2, AlertTriangle, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Bot, BrainCircuit, Box, GitBranch, Copy, Download, Image as ImageIcon, Plus, Search, Sparkles, Trash2, AlertTriangle, XCircle, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
 import { toPng } from 'html-to-image';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { motion, AnimatePresence } from "framer-motion";
 
 import { cnnCatalog, transformerCatalog, unetCatalog, mlCatalog, lossCatalog, activations } from "./data/catalogs.js";
 import { imageDatasets, csvDatasets, augmentations, imageFilters } from "./data/datasets.js";
@@ -58,7 +59,7 @@ export default function App() {
   
   const [draggedId, setDraggedId] = useState(null);
   const [dropTargetIdx, setDropTargetIdx] = useState(null);
-  const [isDropInvalid, setIsDropInvalid] = useState(false);
+  const [dropErrors, setDropErrors] = useState([]);
 
   const canvasRef = useRef(null);
   const canvasInnerRef = useRef(null);
@@ -191,7 +192,7 @@ export default function App() {
   function simulateValidation(nextGraph) {
     const s = calculateShapes(nextGraph, dataset, mode);
     const v = validateArchitecture(nextGraph, s, mode);
-    return v.errors.length > 0;
+    return v.errors;
   }
 
   function handleDropTarget(e, idx) {
@@ -207,13 +208,13 @@ export default function App() {
         if (from >= 0 && from !== idx) {
           const [b] = next.splice(from, 1);
           next.splice(from < idx ? idx - 1 : idx, 0, b);
-          setIsDropInvalid(simulateValidation(next));
+          setDropErrors(simulateValidation(next));
         }
       } else if (kind) {
         const tmpl = catalog.find(i => i.kind === kind);
         if (tmpl) {
           next.splice(idx, 0, cloneBlock(tmpl));
-          setIsDropInvalid(simulateValidation(next));
+          setDropErrors(simulateValidation(next));
         }
       }
     }
@@ -224,8 +225,8 @@ export default function App() {
     setDropTargetIdx(null);
     dragScrollRef.current = 0;
     
-    if (isDropInvalid) {
-      setToast("Invalid drop location — breaks architecture rules.");
+    if (dropErrors.length > 0) {
+      setToast(dropErrors.map(e => e.message).join(" | "));
       return; // Reject drop!
     }
 
@@ -251,6 +252,19 @@ export default function App() {
         setSelectedId(block.id);
       }
     }
+  }
+
+  function moveBlock(idx, direction) {
+    if ((direction === -1 && idx === 0) || (direction === 1 && idx === graph.length - 1)) return;
+    const next = [...graph];
+    const [b] = next.splice(idx, 1);
+    next.splice(idx + direction, 0, b);
+    const errors = simulateValidation(next);
+    if (errors.length > 0) {
+      setToast(errors.map(e => e.message).join(" | "));
+      return; // Reject move!
+    }
+    setGraphs(p => ({ ...p, [mode]: next }));
   }
 
   function captureDiagram() {
@@ -354,6 +368,7 @@ export default function App() {
                 </svg>
                 <div className={`pipeline ${mode === 'unet' ? 'unet-layout' : ''}`}>
                   {!graph.length && <div className="empty">Drag & drop architecture blocks here</div>}
+                <AnimatePresence>
                   {graph.map((block, idx) => {
                     const gridStyle = {};
                     if (mode === "unet") {
@@ -362,15 +377,23 @@ export default function App() {
                       else { gridStyle.gridColumn = 3; gridStyle.gridRow = Math.max(1, currentEnc - currentDec); currentDec++; }
                     }
                     return (
-                      <div key={block.id} className="node-wrapper" style={gridStyle}>
-                        {dropTargetIdx === idx && <div className={`drop-indicator ${isDropInvalid?'invalid':''}`}/>}
+                      <motion.div 
+                        layout 
+                        initial={{ opacity: 0, scale: 0.8 }} 
+                        animate={{ opacity: 1, scale: 1 }} 
+                        exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
+                        key={block.id} 
+                        className="node-wrapper" 
+                        style={gridStyle}
+                      >
+                        {dropTargetIdx === idx && <div className={`drop-indicator ${dropErrors.length>0?'invalid':''}`}/>}
                         <article 
                           ref={el => el ? nodeRefs.current.set(block.id, el) : nodeRefs.current.delete(block.id)}
                           className={`node ${mode} ${selectedId === block.id ? "selected" : ""} ${issues.get(block.id)==="error"?"v-error":issues.get(block.id)==="warning"?"v-warning":""} ${draggedId===block.id?"dragging":""}`}
                           onClick={() => setSelectedId(block.id)}
                           draggable
                           onDragStart={e => { e.dataTransfer.setData("app/id", block.id); setDraggedId(block.id); }}
-                          onDragEnd={() => { setDraggedId(null); setDropTargetIdx(null); dragScrollRef.current=0; }}
+                          onDragEnd={() => { setDraggedId(null); setDropTargetIdx(null); setDropErrors([]); dragScrollRef.current=0; }}
                           onDragOver={e => handleDropTarget(e, idx)}
                           onDrop={e => { e.stopPropagation(); handleDrop(e, idx); }}
                         >
@@ -378,16 +401,25 @@ export default function App() {
                             <div className="drag-handle"><span/><span/><span/></div>
                             <span className="glyph">{block.glyph}</span>
                             <div><strong>{block.label}</strong><small>{block.kind}</small></div>
-                            <button className="icon-btn" onClick={e=>{e.stopPropagation(); setGraphs(p=>({...p,[mode]:graph.filter(b=>b.id!==block.id)}))}}><Trash2 size={16}/></button>
+                            <div style={{ display: 'flex', gap: 2 }}>
+                              {mode !== "unet" && (
+                                <>
+                                  <button className="icon-btn mini" onClick={(e) => { e.stopPropagation(); moveBlock(idx, -1); }} disabled={idx === 0}><ChevronUp size={14}/></button>
+                                  <button className="icon-btn mini" onClick={(e) => { e.stopPropagation(); moveBlock(idx, 1); }} disabled={idx === graph.length - 1}><ChevronDown size={14}/></button>
+                                </>
+                              )}
+                              <button className="icon-btn mini" onClick={e=>{e.stopPropagation(); setGraphs(p=>({...p,[mode]:graph.filter(b=>b.id!==block.id)}))}}><Trash2 size={14}/></button>
+                            </div>
                           </div>
                           <div className="node-body">
                             {mode !== "ml" && shapes[idx] && <span className="chip dim-flow">{shapes[idx].h_in}×{shapes[idx].w_in}×{shapes[idx].c_in} → {shapes[idx].h}×{shapes[idx].w}×{shapes[idx].c}</span>}
                           </div>
                         </article>
-                      </div>
+                      </motion.div>
                     );
                   })}
-                  {dropTargetIdx === graph.length && <div className={`drop-indicator ${isDropInvalid?'invalid':''}`} style={{bottom: '-20px', top: 'auto'}}/>}
+                </AnimatePresence>
+                {dropTargetIdx === graph.length && <div className={`drop-indicator ${dropErrors.length>0?'invalid':''}`} style={{bottom: '-20px', top: 'auto'}}/>}
                 </div>
               </div>
             </div>

@@ -85,6 +85,7 @@ h1{font-size:clamp(18px,2vw,24px);line-height:1;font-weight:900;letter-spacing:-
 }
 .actions{display:flex;gap:6px}
 .icon-btn{width:40px;padding:0;display:inline-grid;place-items:center}
+.icon-btn.mini{width:28px;min-height:28px;}
 .primary{
   background:linear-gradient(180deg,#ff2a46,var(--red-d));
   border-color:#ff5068;padding:0 16px;
