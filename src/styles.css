@@ -60,8 +60,8 @@ button:hover,button:focus-visible{
 button:active{transform:scale(0.96)}
 input,select,textarea{
   width:100%;min-height:40px;border:1px solid var(--line);border-radius:var(--radius);
-  background:rgba(0,0,0,0.3);color:var(--text);padding:8px 12px;outline:none;transition:all 0.2s;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+  background:var(--panel2);color:var(--text);padding:8px 12px;outline:none;transition:all 0.2s;
+  box-shadow: inset 0 1px 3px var(--line-soft);
 }
 input:focus,select:focus,textarea:focus{
   border-color:var(--red);box-shadow:0 0 0 3px rgba(255,51,85,0.15), inset 0 1px 3px rgba(0,0,0,0.3);
@@ -72,7 +72,7 @@ input:focus,select:focus,textarea:focus{
 .topbar{
   position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:12px;
   padding:10px 16px;border-bottom:1px solid var(--line-soft);
-  background:rgba(5,5,5,0.85);backdrop-filter:blur(24px) saturate(1.5);
+  background:var(--panel);backdrop-filter:blur(24px) saturate(1.5);
 }
 .brand{display:flex;align-items:center;gap:12px;min-width:0;margin-right:auto}
 .logo{
@@ -87,7 +87,7 @@ h1{font-size:clamp(18px,2vw,22px);line-height:1;font-weight:800;letter-spacing:-
 .brand p{margin:4px 0 0;color:var(--muted);font-size:12px; font-weight: 500;}
 .tabs,.mode-switch{
   display:flex;gap:4px;padding:4px;border:1px solid var(--line);
-  border-radius:24px;background:rgba(24, 24, 27, 0.6); backdrop-filter: blur(8px);
+  border-radius:24px;background:var(--panel); backdrop-filter: blur(8px);
 }
 .mode-switch {
   overflow-x:auto; white-space:nowrap;
@@ -102,11 +102,11 @@ h1{font-size:clamp(18px,2vw,22px);line-height:1;font-weight:800;letter-spacing:-
   border-radius: 20px;
 }
 .tabs button:hover,.mode-switch button:hover {
-  color: var(--text); background: rgba(255,255,255,0.05);
+  color: var(--text); background: var(--line-soft);
 }
 .tabs button.active,.mode-switch button.active{
-  color:#fff;background:rgba(255,51,85,0.15);border-color:rgba(255,51,85,0.3);
-  box-shadow:0 2px 12px rgba(255,51,85,0.1);
+  color: var(--red); background:rgba(var(--red-rgb),0.15);border-color:rgba(var(--red-rgb),0.3);
+  box-shadow:0 2px 12px rgba(var(--red-rgb),0.1);
 }
 .actions{display:flex;gap:8px}
 .icon-btn{width:40px;padding:0;display:inline-grid;place-items:center}
@@ -194,15 +194,15 @@ h1{font-size:clamp(18px,2vw,22px);line-height:1;font-weight:800;letter-spacing:-
   transition:all 0.25s cubic-bezier(0.2,0,0,1);
 }
 .palette-item:hover{
-  border-left-color:var(--red);background:rgba(255,255,255,0.05);
-  transform:translateX(4px);box-shadow:0 8px 24px rgba(0,0,0,0.3);
+  border-left-color:var(--red);background:var(--line-soft);
+  transform:translateX(4px);box-shadow:0 8px 24px rgba(0,0,0,0.1);
 }
 .palette-item.ml{border-left-color:var(--cyan)}
-.palette-item.ml:hover{border-left-color:#99eaff;background:#0d1c22}
+.palette-item.ml:hover{border-left-color:var(--cyan);background:rgba(var(--cyan-rgb),0.1)}
 .palette-item.transformer{border-left-color:var(--violet)}
-.palette-item.transformer:hover{border-left-color:#cba9ff;background:#161026}
+.palette-item.transformer:hover{border-left-color:var(--violet);background:rgba(167,139,250,0.1)}
 .palette-item.unet{border-left-color:var(--teal)}
-.palette-item.unet:hover{border-left-color:#52e3cc;background:#0d1c1a}
+.palette-item.unet:hover{border-left-color:var(--teal);background:rgba(45,212,191,0.1)}
 .palette-item small,.node small,.dataset-card small{
   display:block;margin-top:4px;color:var(--muted);font-size:11px;line-height:1.4; font-weight: 500;
 }
@@ -219,7 +219,7 @@ h1{font-size:clamp(18px,2vw,22px);line-height:1;font-weight:800;letter-spacing:-
 .canvas-toolbar{
   min-height:54px;display:flex;align-items:center;justify-content:space-between;
   gap:10px;padding:8px 14px;border-bottom:1px solid var(--line-soft);
-  background:rgba(10,10,13,0.95);flex-shrink:0;
+  background:var(--panel2);flex-shrink:0;
 }
 .validation-banner{
   padding:10px 14px;border-bottom:1px solid rgba(255,27,58,0.3);
@@ -231,9 +231,9 @@ h1{font-size:clamp(18px,2vw,22px);line-height:1;font-weight:800;letter-spacing:-
 .validation-banner .v-icon{margin-right:6px}
 
 .canvas-container{
-  flex:1;position:relative;overflow:auto;background-color:#09090b;
+  flex:1;position:relative;overflow:auto;background-color:var(--bg);
   background-image:
-    radial-gradient(rgba(255,255,255,0.1) 1px, transparent 1px);
+    radial-gradient(var(--line) 1px, transparent 1px);
   background-size:24px 24px;
 }
 .canvas-inner{
@@ -273,8 +273,8 @@ h1{font-size:clamp(18px,2vw,22px);line-height:1;font-weight:800;letter-spacing:-
 .empty{
   width:min(480px,100%);min-height:180px;margin:100px auto 0;
   display:grid;place-items:center;padding:20px;
-  border:2px dashed rgba(255,27,58,0.4);border-radius:var(--radius);
-  background:rgba(20,10,12,0.5);color:var(--muted);text-align:center;
+  border:2px dashed rgba(var(--red-rgb),0.4);border-radius:var(--radius);
+  background:var(--panel);color:var(--muted);text-align:center;
   animation:emptyPulse 3s ease-in-out infinite;
 }
 @keyframes emptyPulse{0%,100%{border-color:rgba(255,27,58,0.25)}50%{border-color:rgba(255,27,58,0.55)}}
@@ -292,9 +292,9 @@ h1{font-size:clamp(18px,2vw,22px);line-height:1;font-weight:800;letter-spacing:-
 .node-wrapper{position:relative;width:100%}
 .node{
   position:relative;width:100%;padding:14px 16px;
-  border:1px solid rgba(255,255,255,0.1);border-left:4px solid var(--red);
-  border-radius:var(--radius);background:rgba(24, 24, 27, 0.85); backdrop-filter: blur(12px);
-  box-shadow:0 8px 24px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.05);cursor:grab;touch-action:manipulation;
+  border:1px solid var(--line);border-left:4px solid var(--red);
+  border-radius:var(--radius);background:var(--panel); backdrop-filter: blur(12px);
+  box-shadow:0 8px 24px rgba(0,0,0,0.5), inset 0 1px 1px var(--line-soft);cursor:grab;touch-action:manipulation;
   transition:all 0.25s cubic-bezier(0.2,0,0,1);animation:nodeIn 0.4s ease-out;
 }
 @keyframes nodeIn{from{opacity:0;transform:translateY(-16px) scale(0.96)}to{opacity:1;transform:none}}
@@ -339,12 +339,12 @@ h2 { margin: 0 0 16px; color:var(--text); font-size:14px; font-weight:800; lette
 .dataset-card{
   min-height:92px;display:grid;gap:8px;padding:14px;
   border:1px solid var(--line);border-radius:var(--radius);
-  background:rgba(255,255,255,0.02);transition:all 0.2s;
+  background:var(--panel2);transition:all 0.2s;
 }
-.dataset-card:hover{border-color:rgba(255,255,255,0.15);background:rgba(255,255,255,0.05)}
+.dataset-card:hover{border-color:var(--muted);background:var(--panel)}
 .dataset-card.active{
-  border-color:var(--red);background:rgba(255,51,85,0.05);
-  box-shadow:0 0 0 2px rgba(255,51,85,0.2);
+  border-color:var(--red);background:rgba(var(--red-rgb),0.05);
+  box-shadow:0 0 0 2px rgba(var(--red-rgb),0.2);
 }
 .dataset-card div{display:flex;justify-content:space-between;align-items:flex-start;gap:6px}
 .dataset-card a{
@@ -356,21 +356,21 @@ h2 { margin: 0 0 16px; color:var(--text); font-size:14px; font-weight:800; lette
 .check{
   min-height:44px;display:flex;gap:12px;align-items:center;padding:10px 14px;
   border:1px solid var(--line);border-radius:var(--radius);
-  background:rgba(255,255,255,0.02);color:var(--text);font-size:13px;text-transform:none;
+  background:var(--panel2);color:var(--text);font-size:13px;text-transform:none;
   cursor:pointer; transition: all 0.2s;
 }
-.check:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); }
+.check:hover { border-color: var(--muted); background: var(--panel); }
 .check input{width:18px;min-height:18px;accent-color:var(--red)}
 
 .loss-grid{display:grid;gap:8px; grid-template-columns:repeat(2,minmax(0,1fr));}
 .loss-card{
   display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
   padding:14px;border:1px solid var(--line);border-radius:var(--radius);
-  background:rgba(255,255,255,0.02);cursor:pointer;transition:all 0.2s;
+  background:var(--panel2);cursor:pointer;transition:all 0.2s;
 }
 .loss-card div { display: flex; flex-direction: column; gap: 4px; }
-.loss-card:hover{border-color:rgba(255,51,85,0.5); background:rgba(255,255,255,0.05);}
-.loss-card.active{border-color:var(--red);box-shadow:0 0 0 2px rgba(255,51,85,0.2);background:rgba(255,51,85,0.05)}
+.loss-card:hover{border-color:rgba(var(--red-rgb),0.5); background:var(--panel);}
+.loss-card.active{border-color:var(--red);box-shadow:0 0 0 2px rgba(var(--red-rgb),0.2);background:rgba(var(--red-rgb),0.05)}
 
 /* ─── Code ─── */
 .code{
@@ -425,7 +425,7 @@ h2 { margin: 0 0 16px; color:var(--text); font-size:14px; font-weight:800; lette
 }
 .visual-header h2 {
   font-size: 20px;
-  color: #fff;
+  color: var(--text);
   margin: 0;
 }
 .visual-header .controls {
@@ -510,7 +510,9 @@ h2 { margin: 0 0 16px; color:var(--text); font-size:14px; font-weight:800; lette
   align-items: center;
   height: 100%;
   min-height: 400px;
-  background: #08080a;
+  background: var(--bg);
+  background-image: radial-gradient(var(--line-soft) 1px, transparent 1px);
+  background-size: 20px 20px;
   border-radius: var(--radius);
   border: 1px solid var(--line);
   position: relative;
@@ -528,11 +530,11 @@ h2 { margin: 0 0 16px; color:var(--text); font-size:14px; font-weight:800; lette
 }
 
 .comment-box {
-  background: rgba(255,27,58,0.08);
-  border: 1px solid rgba(255,27,58,0.3);
+  background: rgba(var(--red-rgb),0.08);
+  border: 1px solid rgba(var(--red-rgb),0.3);
   border-radius: var(--radius);
   padding: 16px;
-  color: #fff;
+  color: var(--text);
   line-height: 1.5;
 }
 .comment-header {
@@ -555,7 +557,7 @@ h2 { margin: 0 0 16px; color:var(--text); font-size:14px; font-weight:800; lette
   gap: 12px;
 }
 .detail-card {
-  background: #101015;
+  background: var(--panel2);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 16px;
@@ -588,7 +590,7 @@ h2 { margin: 0 0 16px; color:var(--text); font-size:14px; font-weight:800; lette
   border-radius: 4px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  background: #000;
+  background: var(--panel);
 }
 .shape-badge.in { color: var(--muted); border: 1px solid var(--line); }
 .shape-badge.out { color: var(--cyan); border: 1px solid var(--cyan); box-shadow: 0 0 12px rgba(96,224,255,0.2); }

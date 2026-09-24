@@ -636,8 +636,8 @@ export default function App() {
             )}
             
             {view === "code" && (
-               <div style={{height:'100%', overflow:'auto', backgroundColor:'#1e1e1e', margin:-12}}>
-                  <SyntaxHighlighter language="python" style={vscDarkPlus} showLineNumbers customStyle={{margin:0, padding:'24px', fontSize:'13px', background:'transparent'}}>
+               <div style={{height:'100%', overflow:'auto', backgroundColor: theme === 'dark' ? '#1e1e1e' : '#f8f9fa', margin:-12}}>
+                  <SyntaxHighlighter language="python" style={theme === 'dark' ? vscDarkPlus : vs} showLineNumbers customStyle={{margin:0, padding:'24px', fontSize:'13px', background:'transparent'}}>
                     {generatedCode}
                   </SyntaxHighlighter>
                </div>
