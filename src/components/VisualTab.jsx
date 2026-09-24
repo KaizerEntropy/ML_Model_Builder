@@ -162,32 +162,59 @@ export default function VisualTab({ graph, shapes }) {
 }
 
 function TensorVisualization({ shape, isInput, blockKind }) {
-  // A stylized abstract visualization of a tensor
-  // We use CSS transforms to create a pseudo-3D block.
-  // Dimensions are scaled logarithmically or clamped to keep UI manageable.
-  
-  const scale = (val) => Math.max(40, Math.min(200, Math.log2(val || 1) * 20));
-  
+  const scale = (val) => Math.max(40, Math.min(220, Math.log2(val || 1) * 25));
   const width = scale(shape.w);
   const height = scale(shape.h);
-  const depth = scale(shape.c) * 0.5; // Depth represents channels
+  
+  const layerCount = isInput ? 1 : (shape.c <= 3 ? shape.c : Math.min(5, Math.ceil(Math.log2(shape.c))));
+  const spacing = 14; 
+  const totalDepth = layerCount * spacing;
 
   return (
     <div className="tensor-scene">
       <motion.div 
         className={`tensor-cube ${isInput ? 'input-cube' : ''}`}
-        initial={{ rotateX: 60, rotateZ: -45, scale: 0.8 }}
-        animate={{ rotateX: 60, rotateZ: -45, scale: 1 }}
+        initial={{ rotateX: 65, rotateZ: -45, scale: 0.8 }}
+        animate={{ rotateX: 65, rotateZ: -45, scale: 1 }}
         transition={{ type: "spring" }}
+        style={{ width, height, position: 'relative', transformStyle: 'preserve-3d' }}
       >
-        <div className="face top" style={{ width, height: depth, transform: `translateZ(${height}px)` }}></div>
-        <div className="face front" style={{ width, height, transform: `translateY(${depth}px) rotateX(-90deg)` }}>
-          <div className="grid-overlay"></div>
-        </div>
-        <div className="face right" style={{ width: depth, height, transform: `translateX(${width}px) translateY(${depth/2}px) rotateY(90deg) rotateX(-90deg)` }}></div>
+        {Array.from({ length: layerCount }).map((_, i) => (
+          <div 
+            key={i} 
+            className="feature-plane" 
+            style={{ 
+              width, height, 
+              position: 'absolute', 
+              transform: `translateZ(${i * spacing}px)`,
+              background: isInput ? 'rgba(var(--red-rgb), 0.15)' : 'rgba(var(--cyan-rgb), 0.15)',
+              border: `1.5px solid rgba(${isInput ? 'var(--red-rgb)' : 'var(--cyan-rgb)'}, 0.6)`,
+              boxShadow: `inset 0 0 16px rgba(${isInput ? 'var(--red-rgb)' : 'var(--cyan-rgb)'}, 0.2)`,
+              borderRadius: '2px'
+            }}
+          >
+            {(!isInput && i === layerCount - 1) && <div className="grid-overlay" style={{width: '100%', height: '100%', backgroundImage: 'linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px)', backgroundSize: '10px 10px'}} />}
+          </div>
+        ))}
+        {(!isInput && blockKind && (blockKind.includes('conv') || blockKind.includes('pool'))) && (
+           <motion.div 
+              initial={{ x: 0, y: 0, opacity: 0 }}
+              animate={{ x: width - 30, y: height - 30, opacity: 1 }}
+              transition={{ duration: 2, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
+              className="kernel-box" 
+              style={{
+                width: 30, height: 30, position: 'absolute',
+                background: 'var(--panel2)',
+                transform: `translateZ(${totalDepth + 4}px)`,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+                border: '2px solid var(--text)',
+                borderRadius: '2px'
+             }} 
+           />
+        )}
       </motion.div>
       
-      <div className="tensor-labels">
+      <div className="tensor-labels" style={{ position: 'absolute', bottom: 20, display: 'flex', gap: 24, fontSize: 13, fontWeight: 'bold', color: isInput ? 'var(--red)' : 'var(--cyan)', fontFamily: 'JetBrains Mono, monospace' }}>
         <div className="label-c">C: {shape.c}</div>
         <div className="label-h">H: {shape.h}</div>
         <div className="label-w">W: {shape.w}</div>

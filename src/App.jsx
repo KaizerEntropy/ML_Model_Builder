@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Bot, BrainCircuit, Box, GitBranch, Copy, Download, Image as ImageIcon, Plus, Search, Sparkles, Trash2, AlertTriangle, XCircle, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Target, FileCode } from "lucide-react";
+import { Bot, BrainCircuit, Box, GitBranch, Copy, Download, Image as ImageIcon, Plus, Search, Sparkles, Trash2, AlertTriangle, XCircle, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Target, FileCode, Sun, Moon } from "lucide-react";
 import { toPng } from 'html-to-image';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { motion, AnimatePresence } from "framer-motion";
 
 import { cnnCatalog, transformerCatalog, unetCatalog, mlCatalog, odCatalog, lossCatalog, activations } from "./data/catalogs.js";
@@ -55,6 +55,12 @@ export default function App() {
   const [selectedAugs, setSelectedAugs] = useState(["Resize", "HorizontalFlip", "Normalize"]);
   const [selectedFilter, setSelectedFilter] = useState("None");
   const [toast, setToast] = useState("");
+  const [swapMenuId, setSwapMenuId] = useState(null);
+  
+  const [theme, setTheme] = useState("dark");
+  useLayoutEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
   
   const [seqPaths, setSeqPaths] = useState([]);
   const [skipPaths, setSkipPaths] = useState([]);
@@ -229,7 +235,7 @@ export default function App() {
     dragScrollRef.current = 0;
     
     if (dropErrors.length > 0) {
-      setToast(dropErrors.map(e => e.message).join(" | "));
+      setToast("Cannot place block: " + dropErrors.map(e => e.message).join(" | "));
       return; // Reject drop!
     }
 
@@ -264,7 +270,7 @@ export default function App() {
     next.splice(idx + direction, 0, b);
     const errors = simulateValidation(next);
     if (errors.length > 0) {
-      setToast(errors.map(e => e.message).join(" | "));
+      setToast("Cannot move block: " + errors.map(e => e.message).join(" | "));
       return; // Reject move!
     }
     setGraphs(p => ({ ...p, [mode]: next }));
@@ -273,7 +279,7 @@ export default function App() {
   function captureDiagram() {
     if (!canvasInnerRef.current) return;
     setToast("Capturing diagram...");
-    toPng(canvasInnerRef.current, { backgroundColor: '#050505' })
+    toPng(canvasInnerRef.current, { backgroundColor: theme === 'dark' ? '#09090b' : '#f4f4f5' })
       .then(url => {
         const a = document.createElement("a");
         a.href = url; a.download = `model_forge_${mode}.png`; a.click();
@@ -299,6 +305,9 @@ export default function App() {
           ))}
         </nav>
         <div className="actions">
+          <button className="icon-btn" title="Toggle Theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
           <button className="icon-btn" title="Copy Code" onClick={() => navigator.clipboard.writeText(generatedCode).then(()=>setToast("Code Copied!"))}><Copy size={18} /></button>
           <button className="icon-btn" title="Download Code" onClick={() => {
             const blob = new Blob([generatedCode], { type: "text/plain" });
@@ -403,7 +412,10 @@ export default function App() {
                           onDrop={e => { e.stopPropagation(); handleDrop(e, idx); }}
                         >
                           <div className="node-top">
-                            <div className="drag-handle"><span/><span/><span/></div>
+                            <div className="drag-handle" 
+                                 onClick={(e) => { e.stopPropagation(); setSwapMenuId(swapMenuId === block.id ? null : block.id); }}>
+                              <span/><span/><span/>
+                            </div>
                             <span className="glyph">{block.glyph}</span>
                             <div><strong>{block.label}</strong><small>{block.kind}</small></div>
                             <div style={{ display: 'flex', gap: 2 }}>
@@ -415,6 +427,27 @@ export default function App() {
                               )}
                               <button className="icon-btn mini" onClick={e=>{e.stopPropagation(); setGraphs(p=>({...p,[mode]:graph.filter(b=>b.id!==block.id)}))}}><Trash2 size={14}/></button>
                             </div>
+                            {swapMenuId === block.id && (
+                              <div className="swap-dropdown">
+                                <div className="swap-title">Swap Block</div>
+                                {catalog.filter(c => c.group === catalog.find(t => t.kind === block.kind)?.group && c.kind !== block.kind).map(tmpl => (
+                                  <button key={tmpl.kind} onClick={(e) => {
+                                    e.stopPropagation();
+                                    const next = [...graph];
+                                    const newBlock = cloneBlock(tmpl);
+                                    newBlock.id = block.id; // Preserve ID so selection/links remain
+                                    if (["input", "u_input", "od_input"].includes(newBlock.kind)) newBlock.params = { ...newBlock.params, h: dataset.shape?.[0]||224, w: dataset.shape?.[1]||224, c: dataset.shape?.[2]||3 };
+                                    if (["head", "t_head", "u_seg_head", "yolo_head", "yolox_head", "ssd_head", "retina_head", "faster_rcnn_head", "mask_rcnn_head", "centernet_head"].includes(newBlock.kind)) newBlock.params.classes = dataset.classes || 10;
+                                    next[idx] = newBlock;
+                                    setGraphs(p => ({...p, [mode]: next}));
+                                    setSwapMenuId(null);
+                                  }}>{tmpl.label}</button>
+                                ))}
+                                {catalog.filter(c => c.group === catalog.find(t => t.kind === block.kind)?.group && c.kind !== block.kind).length === 0 && (
+                                  <span style={{fontSize: 10, padding: 8, color: 'var(--muted)'}}>No alternatives</span>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div className="node-body">
                             {mode !== "ml" && shapes[idx] && <span className="chip dim-flow">{shapes[idx].h_in}×{shapes[idx].w_in}×{shapes[idx].c_in} → {shapes[idx].h}×{shapes[idx].w}×{shapes[idx].c}</span>}
@@ -429,12 +462,12 @@ export default function App() {
               </div>
               
               {showCode && (
-                <div className="live-code-panel" style={{ width: '450px', borderLeft: '1px solid var(--line-soft)', backgroundColor: '#1e1e1e', overflowY: 'auto', flexShrink: 0 }}>
-                  <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: '#1e1e1e', zIndex: 10 }}>
-                    <strong style={{ color: '#fff', fontSize: '12px' }}>Live Code Preview</strong>
+                <div className="live-code-panel" style={{ width: '450px', borderLeft: '1px solid var(--line-soft)', backgroundColor: theme === 'dark' ? '#1e1e1e' : '#f8f9fa', overflowY: 'auto', flexShrink: 0 }}>
+                  <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: theme === 'dark' ? '#1e1e1e' : '#f8f9fa', zIndex: 10 }}>
+                    <strong style={{ color: theme === 'dark' ? '#fff' : '#000', fontSize: '12px' }}>Live Code Preview</strong>
                     <button className="icon-btn mini" style={{ minHeight: '24px', width: '24px' }} onClick={() => setShowCode(false)}><XCircle size={14}/></button>
                   </div>
-                  <SyntaxHighlighter language="python" style={vscDarkPlus} customStyle={{ margin: 0, padding: '16px', fontSize: '11.5px', background: 'transparent' }}>
+                  <SyntaxHighlighter language="python" style={theme === 'dark' ? vscDarkPlus : vs} customStyle={{ margin: 0, padding: '16px', fontSize: '11.5px', background: 'transparent' }}>
                     {generatedCode}
                   </SyntaxHighlighter>
                 </div>
@@ -582,7 +615,7 @@ export default function App() {
           )
         )}
       </main>
-      <div className={`toast ${toast?"show":""}`}>{toast}</div>
+      <div className={`toast ${toast?"show":""}`}>{toast.includes("Cannot") ? <AlertTriangle size={16} /> : null} {toast}</div>
     </div>
   );
 }
