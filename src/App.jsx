@@ -45,15 +45,36 @@ export default function App() {
   const [graphs, setGraphs] = useState({ cnn: makePreset("cnn", initialData), transformer: makePreset("transformer", initialData), unet: makePreset("unet", initialData), ml: makePreset("ml", csvDatasets[0]), od: makePreset("od", initialData) });
   const [losses, setLosses] = useState({ cnn: lossCatalog.cnn[0], transformer: lossCatalog.transformer[0], unet: lossCatalog.unet[0], ml: lossCatalog.ml[0], od: lossCatalog.od[0] });
   
-  // Training Settings
+  // Isolated State by Mode
   const [trainSettings, setTrainSettings] = useState({
-    epochs: 10, batch_size: 32, lr: 0.001, optimizer: 'Adam', split: 0.2, kfold: 1, visualizations: ['plot_loss', 'confusion_matrix']
+    cnn: { epochs: 10, batch_size: 32, lr: 0.001, optimizer: 'Adam', scheduler: 'CosineAnnealing', mixup: false, cutmix: false, visualizations: ['plot_loss', 'confusion_matrix'] },
+    transformer: { epochs: 30, batch_size: 16, lr: 0.0001, optimizer: 'AdamW', scheduler: 'LinearWarmup', label_smoothing: 0.1, visualizations: ['plot_loss'] },
+    unet: { epochs: 20, batch_size: 8, lr: 0.001, optimizer: 'Adam', scheduler: 'ReduceLROnPlateau', tta: false, crf: false, visualizations: ['plot_loss', 'iou_score'] },
+    ml: { split: 0.2, kfold: 5, search_strategy: 'GridSearch', metric: 'accuracy', visualizations: ['feature_importance'] },
+    od: { epochs: 50, batch_size: 16, lr: 0.001, optimizer: 'SGD', scheduler: 'MultiStepLR', nms_thresh: 0.45, conf_thresh: 0.25, visualizations: ['map_score'] }
   });
 
+  const [datasets, setDatasets] = useState({
+    cnn: imageDatasets.find(d => d.compatible.includes("cnn")),
+    transformer: imageDatasets.find(d => d.compatible.includes("transformer")),
+    unet: imageDatasets.find(d => d.compatible.includes("unet")),
+    ml: csvDatasets[0],
+    od: imageDatasets.find(d => d.compatible.includes("od"))
+  });
+
+  const [selectedAugs, setSelectedAugs] = useState({
+    cnn: ["Resize", "HorizontalFlip", "Normalize"],
+    transformer: ["Resize", "Normalize", "RandAugment"],
+    unet: ["Resize", "HorizontalFlip", "VerticalFlip", "Normalize"],
+    ml: [],
+    od: ["Resize", "ColorJitter", "Normalize"]
+  });
+  
   const [selectedId, setSelectedId] = useState(graphs.cnn[0]?.id || null);
-  const [dataset, setDataset] = useState(initialData);
-  const [selectedAugs, setSelectedAugs] = useState(["Resize", "HorizontalFlip", "Normalize"]);
-  const [selectedFilter, setSelectedFilter] = useState("None");
+
+  const [selectedFilters, setSelectedFilters] = useState({
+    cnn: "None", transformer: "None", unet: "None", ml: "None", od: "None"
+  });
   const [toast, setToast] = useState("");
   const [swapMenuId, setSwapMenuId] = useState(null);
   
@@ -74,6 +95,11 @@ export default function App() {
   const nodeRefs = useRef(new Map());
   const dragScrollRef = useRef(0);
 
+  const dataset = datasets[mode];
+  const currentAugs = selectedAugs[mode];
+  const currentFilter = selectedFilters[mode];
+  const currentTrainSettings = trainSettings[mode];
+
   const graph = graphs[mode];
   const catalog = { cnn: cnnCatalog, transformer: transformerCatalog, unet: unetCatalog, ml: mlCatalog, od: odCatalog }[mode];
   
@@ -82,12 +108,12 @@ export default function App() {
   const issues = useMemo(() => issueMap(validation), [validation]);
   
   const generatedCode = useMemo(() => {
-    if (mode === "cnn") return generateTorchCode(graph, dataset, selectedAugs, losses.cnn, trainSettings, selectedFilter);
-    if (mode === "transformer") return generateTransformerCode(graph, dataset, selectedAugs, losses.transformer, trainSettings, selectedFilter);
-    if (mode === "unet") return generateUnetCode(graph, dataset, selectedAugs, losses.unet, trainSettings, selectedFilter);
-    if (mode === "od") return generateODCode(graph, dataset, selectedAugs, losses.od, trainSettings, selectedFilter);
-    return generateSklearnCode(graph, losses.ml, trainSettings);
-  }, [mode, graph, dataset, selectedAugs, losses, trainSettings, selectedFilter]);
+    if (mode === "cnn") return generateTorchCode(graph, dataset, currentAugs, losses.cnn, currentTrainSettings, currentFilter);
+    if (mode === "transformer") return generateTransformerCode(graph, dataset, currentAugs, losses.transformer, currentTrainSettings, currentFilter);
+    if (mode === "unet") return generateUnetCode(graph, dataset, currentAugs, losses.unet, currentTrainSettings, currentFilter);
+    if (mode === "od") return generateODCode(graph, dataset, currentAugs, losses.od, currentTrainSettings, currentFilter);
+    return generateSklearnCode(graph, losses.ml, currentTrainSettings, dataset);
+  }, [mode, graph, dataset, currentAugs, losses, currentTrainSettings, currentFilter]);
 
   const selected = graph.find(b => b.id === selectedId);
 
@@ -488,7 +514,7 @@ export default function App() {
                 </div>
                 <div className="dataset-grid">
                   {datasetsToRender.map(d => (
-                    <div key={d.name} className={`dataset-card ${dataset.name === d.name ? "active" : ""}`} onClick={() => setDataset(d)}>
+                    <div key={d.name} className={`dataset-card ${dataset.name === d.name ? "active" : ""}`} onClick={() => setDatasets(p => ({...p, [mode]: d}))}>
                       <div><strong>{d.name}</strong> <a href={d.url} target="_blank" rel="noreferrer">Source</a></div>
                       <small>{d.category} • {d.classes||d.target} • {d.size||d.samples}</small>
                     </div>
@@ -499,13 +525,13 @@ export default function App() {
                     <h2>Image Augmentations</h2>
                     <div className="check-grid">
                       {augmentations.map(a => (
-                        <label key={a} className="check"><input type="checkbox" checked={selectedAugs.includes(a)} onChange={() => setSelectedAugs(p => p.includes(a)?p.filter(x=>x!==a):[...p,a])}/> {a}</label>
+                        <label key={a} className="check"><input type="checkbox" checked={currentAugs.includes(a)} onChange={() => setSelectedAugs(p => ({...p, [mode]: p[mode].includes(a)?p[mode].filter(x=>x!==a):[...p[mode],a]}))}/> {a}</label>
                       ))}
                     </div>
                     <h2 style={{marginTop: 24}}>Image Filters (Only one selectable)</h2>
                     <div className="check-grid">
                       {imageFilters.map(f => (
-                        <label key={f} className="check"><input type="radio" name="imageFilter" checked={selectedFilter === f} onChange={() => setSelectedFilter(f)}/> {f}</label>
+                        <label key={f} className="check"><input type="radio" name="imageFilter" checked={currentFilter === f} onChange={() => setSelectedFilters(p => ({...p, [mode]: f}))}/> {f}</label>
                       ))}
                     </div>
                   </div>
@@ -517,25 +543,70 @@ export default function App() {
               <div className="scroll">
                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:20}}>
                   <div>
-                    <h2>Training Loop Hyperparameters</h2>
+                    <h2>{mode === "ml" ? "Model Hyperparameters" : "Training Loop Hyperparameters"}</h2>
                     <div className="form-grid">
-                      <label>Epochs <input type="number" value={trainSettings.epochs} onChange={e=>setTrainSettings(p=>({...p, epochs:Number(e.target.value)}))}/></label>
-                      <label>Batch Size <input type="number" value={trainSettings.batch_size} onChange={e=>setTrainSettings(p=>({...p, batch_size:Number(e.target.value)}))}/></label>
-                      <label>Learning Rate <input type="number" step="0.0001" value={trainSettings.lr} onChange={e=>setTrainSettings(p=>({...p, lr:Number(e.target.value)}))}/></label>
-                      <label>Optimizer 
-                        <select value={trainSettings.optimizer} onChange={e=>setTrainSettings(p=>({...p, optimizer:e.target.value}))}>
-                          <option>Adam</option><option>SGD</option><option>RMSprop</option><option>AdamW</option>
-                        </select>
-                      </label>
-                      <label>Train/Val Split (%) <input type="number" step="0.05" value={trainSettings.split} onChange={e=>setTrainSettings(p=>({...p, split:Number(e.target.value)}))}/></label>
-                      <label>k-Fold Splits <input type="number" value={trainSettings.kfold} onChange={e=>setTrainSettings(p=>({...p, kfold:Number(e.target.value)}))}/></label>
+                      {mode !== "ml" && (
+                        <>
+                          <label>Epochs <input type="number" value={currentTrainSettings.epochs} onChange={e=>setTrainSettings(p=>({...p, [mode]: {...p[mode], epochs:Number(e.target.value)}}))}/></label>
+                          <label>Batch Size <input type="number" value={currentTrainSettings.batch_size} onChange={e=>setTrainSettings(p=>({...p, [mode]: {...p[mode], batch_size:Number(e.target.value)}}))}/></label>
+                          <label>Learning Rate <input type="number" step="0.0001" value={currentTrainSettings.lr} onChange={e=>setTrainSettings(p=>({...p, [mode]: {...p[mode], lr:Number(e.target.value)}}))}/></label>
+                          <label>Optimizer 
+                            <select value={currentTrainSettings.optimizer} onChange={e=>setTrainSettings(p=>({...p, [mode]: {...p[mode], optimizer:e.target.value}}))}>
+                              <option>Adam</option><option>SGD</option><option>RMSprop</option><option>AdamW</option>
+                            </select>
+                          </label>
+                          <label>Scheduler 
+                            <select value={currentTrainSettings.scheduler} onChange={e=>setTrainSettings(p=>({...p, [mode]: {...p[mode], scheduler:e.target.value}}))}>
+                              <option>CosineAnnealing</option><option>StepLR</option><option>ReduceLROnPlateau</option><option>LinearWarmup</option><option>MultiStepLR</option>
+                            </select>
+                          </label>
+                        </>
+                      )}
+                      
+                      {mode === "cnn" && (
+                        <>
+                          <label className="check" style={{gridColumn: '1 / -1'}}><input type="checkbox" checked={currentTrainSettings.mixup} onChange={e=>setTrainSettings(p=>({...p, cnn: {...p.cnn, mixup: e.target.checked}}))}/> Enable Mixup</label>
+                          <label className="check" style={{gridColumn: '1 / -1'}}><input type="checkbox" checked={currentTrainSettings.cutmix} onChange={e=>setTrainSettings(p=>({...p, cnn: {...p.cnn, cutmix: e.target.checked}}))}/> Enable CutMix</label>
+                        </>
+                      )}
+                      {mode === "transformer" && (
+                        <label>Label Smoothing <input type="number" step="0.05" value={currentTrainSettings.label_smoothing} onChange={e=>setTrainSettings(p=>({...p, transformer: {...p.transformer, label_smoothing:Number(e.target.value)}}))}/></label>
+                      )}
+                      {mode === "unet" && (
+                        <>
+                          <label className="check" style={{gridColumn: '1 / -1'}}><input type="checkbox" checked={currentTrainSettings.tta} onChange={e=>setTrainSettings(p=>({...p, unet: {...p.unet, tta: e.target.checked}}))}/> Test-Time Augmentation (TTA)</label>
+                          <label className="check" style={{gridColumn: '1 / -1'}}><input type="checkbox" checked={currentTrainSettings.crf} onChange={e=>setTrainSettings(p=>({...p, unet: {...p.unet, crf: e.target.checked}}))}/> Conditional Random Field (CRF)</label>
+                        </>
+                      )}
+                      {mode === "od" && (
+                        <>
+                          <label>NMS Threshold <input type="number" step="0.05" value={currentTrainSettings.nms_thresh} onChange={e=>setTrainSettings(p=>({...p, od: {...p.od, nms_thresh:Number(e.target.value)}}))}/></label>
+                          <label>Confidence Threshold <input type="number" step="0.05" value={currentTrainSettings.conf_thresh} onChange={e=>setTrainSettings(p=>({...p, od: {...p.od, conf_thresh:Number(e.target.value)}}))}/></label>
+                        </>
+                      )}
+                      {mode === "ml" && (
+                        <>
+                          <label>Train/Val Split (%) <input type="number" step="0.05" value={currentTrainSettings.split} onChange={e=>setTrainSettings(p=>({...p, ml: {...p.ml, split:Number(e.target.value)}}))}/></label>
+                          <label>k-Fold Splits <input type="number" value={currentTrainSettings.kfold} onChange={e=>setTrainSettings(p=>({...p, ml: {...p.ml, kfold:Number(e.target.value)}}))}/></label>
+                          <label>Search Strategy 
+                            <select value={currentTrainSettings.search_strategy} onChange={e=>setTrainSettings(p=>({...p, ml: {...p.ml, search_strategy:e.target.value}}))}>
+                              <option>GridSearch</option><option>RandomizedSearch</option>
+                            </select>
+                          </label>
+                          <label>Metric 
+                            <select value={currentTrainSettings.metric} onChange={e=>setTrainSettings(p=>({...p, ml: {...p.ml, metric:e.target.value}}))}>
+                              <option>accuracy</option><option>f1</option><option>roc_auc</option>
+                            </select>
+                          </label>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div>
                     <h2>Visualizations & Tracking</h2>
                     <div className="form-grid" style={{gridTemplateColumns:'1fr'}}>
-                      {(mode === "unet" ? ["plot_loss", "mask_overlay", "iou_trend", "prediction_samples"] : mode === "od" ? ["plot_loss", "bbox_overlay", "map_trend"] : ["plot_loss", "confusion_matrix", "tsne", "gradcam"]).map(v => (
-                         <label key={v} className="check"><input type="checkbox" checked={trainSettings.visualizations.includes(v)} onChange={()=>setTrainSettings(p=>({...p, visualizations: p.visualizations.includes(v)?p.visualizations.filter(x=>x!==v):[...p.visualizations, v]}))} /> Generate {v.replace(/_/g," ")} Code</label>
+                      {(mode === "unet" ? ["plot_loss", "mask_overlay", "iou_trend", "prediction_samples"] : mode === "od" ? ["plot_loss", "bbox_overlay", "map_trend"] : mode === "ml" ? ["feature_importance", "confusion_matrix", "roc_curve"] : ["plot_loss", "confusion_matrix", "tsne", "gradcam"]).map(v => (
+                         <label key={v} className="check"><input type="checkbox" checked={currentTrainSettings.visualizations.includes(v)} onChange={()=>setTrainSettings(p=>({...p, [mode]: {...p[mode], visualizations: p[mode].visualizations.includes(v)?p[mode].visualizations.filter(x=>x!==v):[...p[mode].visualizations, v]}}))} /> Generate {v.replace(/_/g," ")} Code</label>
                       ))}
                     </div>
                   </div>

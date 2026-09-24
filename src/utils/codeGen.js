@@ -28,10 +28,13 @@ function generatePyTorchTrainingLoop(mode, trainSettings, dataset) {
   const split = ts.split || 0.2;
   const kfold = ts.kfold || 1;
   const opt = ts.optimizer || 'Adam';
+  const scheduler = ts.scheduler || 'None';
   const vis = ts.visualizations || [];
   
   const isSeg = mode === "unet";
   const numCls = dataset.classes || 2;
+  const datasetName = dataset.name || "CustomDataset";
+  const datasetUrl = dataset.url || "";
   
   let code = `
 # ==========================================
@@ -50,11 +53,12 @@ LEARNING_RATE = ${lr}
 VAL_SPLIT = ${split}
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Example Dataset Placeholder (Replace with your actual data loader logic)
+# Dataset: ${datasetName}
+${datasetUrl ? `# Source: ${datasetUrl}` : ""}
 class CustomDataset(torch.utils.data.Dataset):
     def __init__(self, transform=None):
         self.transform = transform
-        self.data = torch.randn(100, *MODEL_INPUT) # Dummy data
+        self.data = torch.randn(100, *MODEL_INPUT) # Replace with actual dataloader logic
         ${isSeg ? `self.labels = torch.randint(0, 2, (100, 1, MODEL_INPUT[1], MODEL_INPUT[2])).float()` : `self.labels = torch.randint(0, ${numCls}, (100,))`}
     def __len__(self):
         return 100
@@ -74,6 +78,7 @@ val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False)
 
 model = model.to(DEVICE)
 optimizer = optim.${opt}(model.parameters(), lr=LEARNING_RATE)
+${scheduler === 'CosineAnnealing' ? `scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)` : scheduler === 'StepLR' ? `scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)` : scheduler === 'ReduceLROnPlateau' ? `scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')` : scheduler === 'LinearWarmup' ? `scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: min(1.0, (epoch+1)/5))` : scheduler === 'MultiStepLR' ? `scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 45], gamma=0.1)` : ""}
 
 best_loss = float('inf')
 best_model_wts = copy.deepcopy(model.state_dict())
@@ -86,9 +91,23 @@ for epoch in range(EPOCHS):
     running_loss = 0.0
     for inputs, targets in train_loader:
         inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
+        ${ts.mixup ? `
+        # Mixup implementation
+        alpha = 0.2
+        lam = np.random.beta(alpha, alpha)
+        index = torch.randperm(inputs.size(0)).to(DEVICE)
+        inputs = lam * inputs + (1 - lam) * inputs[index]
+        ` : ""}
+        ${ts.cutmix ? `
+        # CutMix implementation
+        lam = np.random.beta(1.0, 1.0)
+        rand_index = torch.randperm(inputs.size(0)).to(DEVICE)
+        bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
+        inputs[:, :, bbx1:bbx2, bby1:bby2] = inputs[rand_index, :, bbx1:bbx2, bby1:bby2]
+        ` : ""}
         optimizer.zero_grad()
         outputs = model(inputs)
-        loss = criterion(outputs, targets)
+        ${ts.mixup ? `loss = lam * criterion(outputs, targets) + (1 - lam) * criterion(outputs, targets[index])` : `loss = criterion(outputs, targets)`}
         loss.backward()
         optimizer.step()
         running_loss += loss.item() * inputs.size(0)
@@ -111,6 +130,7 @@ for epoch in range(EPOCHS):
     val_losses.append(epoch_val_loss)
     ${isSeg && vis.includes("iou_trend") ? `val_ious.append(epoch_iou / len(val_loader.dataset))` : ""}
 
+    ${scheduler === 'ReduceLROnPlateau' ? `scheduler.step(epoch_val_loss)` : scheduler !== 'None' && scheduler ? `scheduler.step()` : ""}
     print(f"Epoch {epoch+1}/{EPOCHS} - Train Loss: {epoch_train_loss:.4f} - Val Loss: {epoch_val_loss:.4f}")
     if epoch_val_loss < best_loss:
         best_loss = epoch_val_loss
@@ -578,12 +598,16 @@ ${trainLoopCode}
 `;
 }
 
-export function generateSklearnCode(graph, lossConfig, trainSettings) {
+export function generateSklearnCode(graph, lossConfig, trainSettings, dataset) {
   const imp = new Set(["from sklearn.pipeline import Pipeline", "from sklearn.model_selection import train_test_split", "from sklearn.metrics import classification_report", "import matplotlib.pyplot as plt"]);
   const steps = [];
   const ts = trainSettings || {};
   const vis = ts.visualizations || [];
   const testSplit = ts.split || 0.2;
+  const kfold = ts.kfold || 5;
+  const search = ts.search_strategy || "GridSearch";
+  const datasetName = dataset?.name || "CustomDataset";
+  const datasetUrl = dataset?.url || "";
 
   graph.forEach(b => {
     const p = b.params;
@@ -616,9 +640,14 @@ plt.show()
 `;
   }
   
+  if (search === "GridSearch") imp.add("from sklearn.model_selection import GridSearchCV");
+  if (search === "RandomizedSearch") imp.add("from sklearn.model_selection import RandomizedSearchCV");
+  
   return `${[...imp].sort().join("\n")}
 import pandas as pd
 
+# Dataset: ${datasetName}
+${datasetUrl ? `# Source: ${datasetUrl}` : ""}
 DATA_PATH = "data.csv"
 TARGET = "label" # Replace with actual target column
 try:
@@ -631,10 +660,25 @@ ${steps.join("\n") || '    ("model", RandomForestClassifier(n_estimators=300, ra
     ])
 
     print("Fitting model...")
+    ${search === 'GridSearch' ? `
+    # Note: Define param_grid with actual hyperparameters for your model
+    param_grid = {}
+    search_model = GridSearchCV(pipeline, param_grid, cv=${kfold}, scoring='accuracy')
+    search_model.fit(X_train, y_train)
+    best_pipeline = search_model.best_estimator_
+    ` : search === 'RandomizedSearch' ? `
+    # Note: Define param_distributions with actual hyperparameters for your model
+    param_distributions = {}
+    search_model = RandomizedSearchCV(pipeline, param_distributions, cv=${kfold}, scoring='accuracy')
+    search_model.fit(X_train, y_train)
+    best_pipeline = search_model.best_estimator_
+    ` : `
     pipeline.fit(X_train, y_train)
+    best_pipeline = pipeline
+    `}
     
     print("Evaluating model...")
-    preds = pipeline.predict(X_test)
+    preds = best_pipeline.predict(X_test)
     print(classification_report(y_test, preds))
 ${extras}
 except Exception as e:
