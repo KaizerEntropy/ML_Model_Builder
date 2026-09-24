@@ -210,6 +210,36 @@ export const mlCatalog = [
   {group:"Regressors",kind:"mlp_regressor",label:"MLP Regressor",glyph:"MR",meta:"neural net regressor",params:{hidden_layer_sizes:"100,50",max_iter:500}},
 ];
 
+export const odCatalog = [
+  {group:"Input",kind:"od_input",label:"Image Input",glyph:"IN",meta:"OD input",params:{h:640,w:640,c:3}},
+  
+  {group:"Backbone",kind:"cspdarknet",label:"CSPDarknet53",glyph:"CD",meta:"YOLOv4/v5 backbone",params:{pretrained:true}},
+  {group:"Backbone",kind:"darknet53",label:"Darknet-53",glyph:"D3",meta:"YOLOv3 backbone",params:{pretrained:true}},
+  {group:"Backbone",kind:"resnet_fpn",label:"ResNet+FPN Backbone",glyph:"RF",meta:"Faster R-CNN style",params:{depth:50,pretrained:true}},
+  {group:"Backbone",kind:"efficientnet_b0",label:"EfficientNet-B0",glyph:"EB",meta:"EfficientDet style",params:{pretrained:true}},
+  {group:"Backbone",kind:"mobilenet_v3_large",label:"MobileNetV3",glyph:"MV",meta:"Lightweight OD",params:{pretrained:true}},
+  
+  {group:"Neck",kind:"fpn",label:"Feature Pyramid Net",glyph:"FP",meta:"FPN Neck",params:{out_channels:256}},
+  {group:"Neck",kind:"panet",label:"PANet",glyph:"PA",meta:"Path Aggregation",params:{out_channels:256}},
+  {group:"Neck",kind:"bifpn",label:"BiFPN",glyph:"BP",meta:"Bidirectional FPN",params:{out_channels:64,layers:3}},
+  {group:"Neck",kind:"yolo_neck",label:"YOLO Neck",glyph:"YN",meta:"SPP + PAN",params:{}},
+  {group:"Neck",kind:"spp",label:"SPP Block",glyph:"SP",meta:"Spatial Pyramid Pooling",params:{bins:"5,9,13"}},
+  {group:"Neck",kind:"sppf",label:"SPPF Block",glyph:"SF",meta:"Fast SPP",params:{kernel:5}},
+  
+  {group:"Head",kind:"yolo_head",label:"YOLO Head",glyph:"YH",meta:"Anchor-based YOLO",params:{classes:80,anchors:3}},
+  {group:"Head",kind:"yolox_head",label:"YOLOX Head",glyph:"YX",meta:"Anchor-free YOLO",params:{classes:80}},
+  {group:"Head",kind:"ssd_head",label:"SSD Head",glyph:"SH",meta:"Single Shot Detector",params:{classes:20}},
+  {group:"Head",kind:"retina_head",label:"RetinaNet Head",glyph:"RH",meta:"Focal Loss Head",params:{classes:80,anchors:9}},
+  {group:"Head",kind:"faster_rcnn_head",label:"Faster R-CNN Head",glyph:"FR",meta:"Two-stage head",params:{classes:80}},
+  {group:"Head",kind:"mask_rcnn_head",label:"Mask R-CNN Head",glyph:"MR",meta:"OD + Instance Seg",params:{classes:80}},
+  {group:"Head",kind:"centernet_head",label:"CenterNet Head",glyph:"CN",meta:"Keypoint-based",params:{classes:80}},
+  
+  {group:"Components",kind:"rpn",label:"Region Proposal Net",glyph:"RP",meta:"Two-stage proposals",params:{anchors:9}},
+  {group:"Components",kind:"roi_align",label:"RoI Align",glyph:"RA",meta:"Feature cropping",params:{output_size:"7x7",spatial_scale:0.0625}},
+  {group:"Components",kind:"nms",label:"NMS",glyph:"NM",meta:"Non-Max Suppression",params:{iou_threshold:0.45,conf_threshold:0.25}},
+  {group:"Components",kind:"soft_nms",label:"Soft-NMS",glyph:"SN",meta:"Score decay NMS",params:{iou_threshold:0.3,sigma:0.5}},
+];
+
 export const lossCatalog = {
   cnn: [
     {kind:"cross_entropy",label:"CrossEntropyLoss",meta:"multi-class classification",params:{label_smoothing:0.0}},
@@ -248,5 +278,14 @@ export const lossCatalog = {
     {kind:"ml_mae",label:"Mean Absolute Error",meta:"robust regression",params:{}},
     {kind:"ml_hinge",label:"Hinge Loss",meta:"SVM loss",params:{}},
     {kind:"ml_huber",label:"Huber Loss",meta:"robust regression",params:{delta:1.0}},
+  ],
+  od: [
+    {kind:"yolo_loss",label:"YOLO Loss",meta:"Bbox + Obj + Class",params:{box_weight:0.05,obj_weight:1.0,cls_weight:0.5}},
+    {kind:"focal",label:"Focal Loss",meta:"RetinaNet class loss",params:{alpha:0.25,gamma:2.0}},
+    {kind:"smooth_l1",label:"SmoothL1Loss",meta:"Bbox regression",params:{beta:0.11}},
+    {kind:"giou",label:"GIoU Loss",meta:"Generalized IoU",params:{}},
+    {kind:"ciou",label:"CIoU Loss",meta:"Complete IoU",params:{}},
+    {kind:"diou",label:"DIoU Loss",meta:"Distance IoU",params:{}},
+    {kind:"dice",label:"Dice Loss",meta:"Instance segmentation",params:{smooth:1.0}},
   ],
 };

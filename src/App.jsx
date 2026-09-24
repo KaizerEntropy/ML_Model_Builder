@@ -1,29 +1,29 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Bot, BrainCircuit, Box, GitBranch, Copy, Download, Image as ImageIcon, Plus, Search, Sparkles, Trash2, AlertTriangle, XCircle, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
+import { Bot, BrainCircuit, Box, GitBranch, Copy, Download, Image as ImageIcon, Plus, Search, Sparkles, Trash2, AlertTriangle, XCircle, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Target } from "lucide-react";
 import { toPng } from 'html-to-image';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { motion, AnimatePresence } from "framer-motion";
 
-import { cnnCatalog, transformerCatalog, unetCatalog, mlCatalog, lossCatalog, activations } from "./data/catalogs.js";
+import { cnnCatalog, transformerCatalog, unetCatalog, mlCatalog, odCatalog, lossCatalog, activations } from "./data/catalogs.js";
 import { imageDatasets, csvDatasets, augmentations, imageFilters } from "./data/datasets.js";
 import { calculateShapes } from "./utils/shapeCalc.js";
 import { validateArchitecture, issueMap } from "./utils/validation.js";
-import { generateTorchCode, generateTransformerCode, generateUnetCode, generateSklearnCode } from "./utils/codeGen.js";
+import { generateTorchCode, generateTransformerCode, generateUnetCode, generateSklearnCode, generateODCode } from "./utils/codeGen.js";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 function cloneBlock(template) { return { id: uid(), kind: template.kind, label: template.label, glyph: template.glyph, params: structuredClone(template.params || {}), attention: [] }; }
 
 function makePreset(mode, dataset) {
-  const cat = { cnn: cnnCatalog, transformer: transformerCatalog, unet: unetCatalog, ml: mlCatalog }[mode];
-  const seq = { cnn: ["input", "conv", "resnet", "pool", "gap", "head"], transformer: ["t_input", "patch_embed", "pos_embed", "cls_token", "transformer_block", "t_cls_pool", "t_head"], unet: ["u_input", "u_enc", "u_enc", "u_bottleneck", "u_dec", "u_dec", "u_seg_head"], ml: ["tabular_input", "standard_scaler", "random_forest"] }[mode];
+  const cat = { cnn: cnnCatalog, transformer: transformerCatalog, unet: unetCatalog, ml: mlCatalog, od: odCatalog }[mode];
+  const seq = { cnn: ["input", "conv", "resnet", "pool", "gap", "head"], transformer: ["t_input", "patch_embed", "pos_embed", "cls_token", "transformer_block", "t_cls_pool", "t_head"], unet: ["u_input", "u_enc", "u_enc", "u_bottleneck", "u_dec", "u_dec", "u_seg_head"], ml: ["tabular_input", "standard_scaler", "random_forest"], od: ["od_input", "cspdarknet", "panet", "yolo_head"] }[mode];
   const next = [];
   seq.forEach((kind) => {
     const template = cat.find(item => item.kind === kind);
     if (!template) return;
     const block = cloneBlock(template);
-    if (block.kind === "input" || block.kind === "u_input") block.params = { h: dataset.shape?.[0]||224, w: dataset.shape?.[1]||224, c: dataset.shape?.[2]||3 };
-    if (["head", "t_head", "u_seg_head"].includes(block.kind)) block.params.classes = dataset.classes || 10;
+    if (block.kind === "input" || block.kind === "u_input" || block.kind === "od_input") block.params = { h: dataset.shape?.[0]||224, w: dataset.shape?.[1]||224, c: dataset.shape?.[2]||3 };
+    if (["head", "t_head", "u_seg_head", "yolo_head", "yolox_head", "ssd_head", "retina_head", "faster_rcnn_head", "mask_rcnn_head", "centernet_head"].includes(block.kind)) block.params.classes = dataset.classes || 10;
     next.push(block);
   });
   return next;
@@ -40,8 +40,8 @@ export default function App() {
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
 
-  const [graphs, setGraphs] = useState({ cnn: makePreset("cnn", initialData), transformer: makePreset("transformer", initialData), unet: makePreset("unet", initialData), ml: makePreset("ml", csvDatasets[0]) });
-  const [losses, setLosses] = useState({ cnn: lossCatalog.cnn[0], transformer: lossCatalog.transformer[0], unet: lossCatalog.unet[0], ml: lossCatalog.ml[0] });
+  const [graphs, setGraphs] = useState({ cnn: makePreset("cnn", initialData), transformer: makePreset("transformer", initialData), unet: makePreset("unet", initialData), ml: makePreset("ml", csvDatasets[0]), od: makePreset("od", initialData) });
+  const [losses, setLosses] = useState({ cnn: lossCatalog.cnn[0], transformer: lossCatalog.transformer[0], unet: lossCatalog.unet[0], ml: lossCatalog.ml[0], od: lossCatalog.od[0] });
   
   // Training Settings
   const [trainSettings, setTrainSettings] = useState({
@@ -67,7 +67,7 @@ export default function App() {
   const dragScrollRef = useRef(0);
 
   const graph = graphs[mode];
-  const catalog = { cnn: cnnCatalog, transformer: transformerCatalog, unet: unetCatalog, ml: mlCatalog }[mode];
+  const catalog = { cnn: cnnCatalog, transformer: transformerCatalog, unet: unetCatalog, ml: mlCatalog, od: odCatalog }[mode];
   
   const shapes = useMemo(() => calculateShapes(graph, dataset, mode), [graph, dataset, mode]);
   const validation = useMemo(() => validateArchitecture(graph, shapes, mode), [graph, shapes, mode]);
@@ -77,6 +77,7 @@ export default function App() {
     if (mode === "cnn") return generateTorchCode(graph, dataset, selectedAugs, losses.cnn, trainSettings, selectedFilter);
     if (mode === "transformer") return generateTransformerCode(graph, dataset, selectedAugs, losses.transformer, trainSettings, selectedFilter);
     if (mode === "unet") return generateUnetCode(graph, dataset, selectedAugs, losses.unet, trainSettings, selectedFilter);
+    if (mode === "od") return generateODCode(graph, dataset, selectedAugs, losses.od, trainSettings, selectedFilter);
     return generateSklearnCode(graph, losses.ml, trainSettings);
   }, [mode, graph, dataset, selectedAugs, losses, trainSettings, selectedFilter]);
 
@@ -245,8 +246,8 @@ export default function App() {
       if (tmpl) {
         const next = [...graph];
         const block = cloneBlock(tmpl);
-        if (["input", "u_input"].includes(block.kind)) block.params = { h: dataset.shape?.[0]||224, w: dataset.shape?.[1]||224, c: dataset.shape?.[2]||3 };
-        if (["head", "t_head", "u_seg_head"].includes(block.kind)) block.params.classes = dataset.classes || 10;
+        if (["input", "u_input", "od_input"].includes(block.kind)) block.params = { h: dataset.shape?.[0]||224, w: dataset.shape?.[1]||224, c: dataset.shape?.[2]||3 };
+        if (["head", "t_head", "u_seg_head", "yolo_head", "yolox_head", "ssd_head", "retina_head", "faster_rcnn_head", "mask_rcnn_head", "centernet_head"].includes(block.kind)) block.params.classes = dataset.classes || 10;
         next.splice(targetIdx, 0, block);
         setGraphs(p => ({ ...p, [mode]: next }));
         setSelectedId(block.id);
@@ -320,6 +321,7 @@ export default function App() {
               <button className={mode === "cnn" ? "active" : ""} onClick={() => {setMode("cnn"); setDataset(imageDatasets[0]); setDataFilter("All");}}><BrainCircuit size={14}/> CNN</button>
               <button className={mode === "transformer" ? "active" : ""} onClick={() => {setMode("transformer"); setDataset(imageDatasets[0]); setDataFilter("All");}}><Box size={14}/> ViT</button>
               <button className={mode === "unet" ? "active" : ""} onClick={() => {setMode("unet"); setDataset(imageDatasets[0]); setDataFilter("All");}}><GitBranch size={14}/> U-Net</button>
+              <button className={mode === "od" ? "active" : ""} onClick={() => {setMode("od"); setDataset(imageDatasets.find(d=>d.compatible==="od") || imageDatasets[0]); setDataFilter("All");}}><Target size={14}/> OD</button>
               <button className={mode === "ml" ? "active" : ""} onClick={() => {setMode("ml"); setDataset(csvDatasets[0]); setDataFilter("All");}}><Bot size={14}/> ML</button>
             </div>
             <label className="search-row"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search library..."/></label>
@@ -484,7 +486,7 @@ export default function App() {
                   <div>
                     <h2>Visualizations & Tracking</h2>
                     <div className="form-grid" style={{gridTemplateColumns:'1fr'}}>
-                      {(mode === "unet" ? ["plot_loss", "mask_overlay", "iou_trend", "prediction_samples"] : ["plot_loss", "confusion_matrix", "tsne", "gradcam"]).map(v => (
+                      {(mode === "unet" ? ["plot_loss", "mask_overlay", "iou_trend", "prediction_samples"] : mode === "od" ? ["plot_loss", "bbox_overlay", "map_trend"] : ["plot_loss", "confusion_matrix", "tsne", "gradcam"]).map(v => (
                          <label key={v} className="check"><input type="checkbox" checked={trainSettings.visualizations.includes(v)} onChange={()=>setTrainSettings(p=>({...p, visualizations: p.visualizations.includes(v)?p.visualizations.filter(x=>x!==v):[...p.visualizations, v]}))} /> Generate {v.replace(/_/g," ")} Code</label>
                       ))}
                     </div>

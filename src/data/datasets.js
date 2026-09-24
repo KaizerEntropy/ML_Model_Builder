@@ -58,6 +58,13 @@ export const imageDatasets = [
   { category: "Natural Segmentation", name: "Cityscapes", classes: 30, size: "5,000 images", shape: [256, 256, 3], url: "https://www.cityscapes-dataset.com/", compatible: "unet" },
   { category: "Natural Segmentation", name: "CamVid", classes: 32, size: "700 images", shape: [720, 960, 3], url: "http://mi.eng.cam.ac.uk/research/projects/VideoRec/CamVid/", compatible: "unet" },
   { category: "Natural Segmentation", name: "PASCAL VOC 2012", classes: 21, size: "2,913 images", shape: [256, 256, 3], url: "http://host.robots.ox.ac.uk/pascal/VOC/voc2012/", compatible: "unet" },
+
+  /* Object Detection */
+  { category: "Object Detection", name: "COCO 2017", classes: 80, size: "118k images", shape: [640, 640, 3], url: "https://cocodataset.org/", compatible: "od" },
+  { category: "Object Detection", name: "PASCAL VOC 2007+2012", classes: 20, size: "16k images", shape: [416, 416, 3], url: "http://host.robots.ox.ac.uk/pascal/VOC/", compatible: "od" },
+  { category: "Object Detection", name: "Open Images V7", classes: 600, size: "1.7M images", shape: [640, 640, 3], url: "https://storage.googleapis.com/openimages/web/index.html", compatible: "od" },
+  { category: "Object Detection", name: "WiderPerson", classes: 5, size: "13,382 images", shape: [416, 416, 3], url: "http://www.cbsr.ia.ac.cn/users/sfzhang/WiderPerson/", compatible: "od" },
+  { category: "Object Detection", name: "Global Wheat Detection", classes: 1, size: "3,422 images", shape: [1024, 1024, 3], url: "https://www.kaggle.com/c/global-wheat-detection", compatible: "od" }
 ];
 
 export const imageFilters = ["None", "Sobel", "Gaussian", "Laplace", "Canny", "Median"];

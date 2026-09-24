@@ -4,6 +4,7 @@ export function validateArchitecture(graph,shapes,mode){
   if(mode==="ml") return validateML(graph);
   if(mode==="transformer") return validateTransformer(graph,shapes);
   if(mode==="unet") return validateUnet(graph,shapes);
+  if(mode==="od") return validateOD(graph,shapes);
   return validateCNN(graph,shapes);
 }
 function validateCNN(graph,shapes){
@@ -82,6 +83,32 @@ function validateML(graph){
     }
   });
   if(modelCount>0&&lastModel!==graph.length-1) p(graph[lastModel].id,lastModel,"error","Model (Classifier/Regressor) must be placed at the very end of the pipeline.");
+  return{errors:issues.filter(i=>i.severity==="error"),warnings:issues.filter(i=>i.severity==="warning")};
+}
+function validateOD(graph,shapes){
+  const issues=[];const p=(id,i,s,m)=>issues.push({blockId:id,index:i,severity:s,message:m});
+  if(!graph.length) return{errors:[],warnings:[]};
+  if(!["od_input","input"].includes(graph[0].kind)) p(graph[0].id,0,"error","OD network must begin with an Input block.");
+  
+  const backboneKinds = ["cspdarknet","darknet53","resnet_fpn","efficientnet_b0","mobilenet_v3_large"];
+  const neckKinds = ["fpn","panet","bifpn","yolo_neck","spp","sppf"];
+  const headKinds = ["yolo_head","yolox_head","ssd_head","retina_head","faster_rcnn_head","mask_rcnn_head","centernet_head"];
+  
+  const hasBackbone = graph.some(b=>backboneKinds.includes(b.kind));
+  const hasNeck = graph.some(b=>neckKinds.includes(b.kind));
+  const hasHead = graph.some(b=>headKinds.includes(b.kind));
+  
+  if(!hasBackbone && hasHead) p(null,-1,"error","Add a backbone before the head.");
+  if(!hasHead) p(null,-1,"warning","Object Detection models typically end with a head (e.g. YOLO Head).");
+
+  let heads=0,lastHead=-1;
+  graph.forEach((b,i)=>{
+    const sh=shapes[i];
+    if(sh&&(sh.h<=0||sh.w<=0)) p(b.id,i,"error","Spatial dims collapsed to 0 — check kernel/stride/padding.");
+    if(headKinds.includes(b.kind)){heads++;lastHead=i;}
+  });
+  if(heads>0&&lastHead!==graph.length-1) p(graph[lastHead].id,lastHead,"error","Detection Head should be placed at the very end.");
+  if(heads>1) p(null,-1,"error","Multiple detection heads detected.");
   return{errors:issues.filter(i=>i.severity==="error"),warnings:issues.filter(i=>i.severity==="warning")};
 }
 export function issueMap(issues){

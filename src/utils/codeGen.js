@@ -506,6 +506,78 @@ ${trainLoopCode}
 `;
 }
 
+export function generateODCode(graph, dataset, augs, lossConfig, trainSettings, filterConfig="None") {
+  const lines = []; let li = 0;
+  
+  graph.forEach(b => {
+    const p = b.params;
+    if (b.kind === "od_input") return;
+    let expr = "nn.Identity()";
+    
+    // Backbones
+    if (b.kind === "cspdarknet") expr = "CSPDarknet53(pretrained=True)";
+    else if (b.kind === "darknet53") expr = "Darknet53(pretrained=True)";
+    else if (b.kind === "resnet_fpn") expr = `ResNetBackbone(depth=${p.depth}, pretrained=${p.pretrained})`;
+    else if (b.kind === "efficientnet_b0") expr = "EfficientNetBackbone(pretrained=True)";
+    else if (b.kind === "mobilenet_v3_large") expr = "MobileNetV3Backbone(pretrained=True)";
+    
+    // Necks
+    else if (b.kind === "fpn") expr = `FPN(out_channels=${p.out_channels})`;
+    else if (b.kind === "panet") expr = `PANet(out_channels=${p.out_channels})`;
+    else if (b.kind === "bifpn") expr = `BiFPN(out_channels=${p.out_channels}, num_layers=${p.layers})`;
+    else if (b.kind === "yolo_neck") expr = "YOLONeck()";
+    else if (b.kind === "spp") expr = `SPP(bins=[${p.bins}])`;
+    else if (b.kind === "sppf") expr = `SPPF(kernel_size=${p.kernel})`;
+    
+    // Heads
+    else if (b.kind === "yolo_head") expr = `YOLOHead(num_classes=${p.classes}, num_anchors=${p.anchors})`;
+    else if (b.kind === "yolox_head") expr = `YOLOXHead(num_classes=${p.classes})`;
+    else if (b.kind === "ssd_head") expr = `SSDHead(num_classes=${p.classes})`;
+    else if (b.kind === "retina_head") expr = `RetinaNetHead(num_classes=${p.classes}, num_anchors=${p.anchors})`;
+    else if (b.kind === "faster_rcnn_head") expr = `FasterRCNNHead(num_classes=${p.classes})`;
+    else if (b.kind === "mask_rcnn_head") expr = `MaskRCNNHead(num_classes=${p.classes})`;
+    else if (b.kind === "centernet_head") expr = `CenterNetHead(num_classes=${p.classes})`;
+    
+    // Components
+    else if (b.kind === "rpn") expr = `RegionProposalNetwork(anchors=${p.anchors})`;
+    else if (b.kind === "roi_align") expr = `RoIAlign(output_size=${Q(p.output_size)}, spatial_scale=${p.spatial_scale})`;
+    else if (b.kind === "nms") expr = `NMS(iou_threshold=${p.iou_threshold}, conf_threshold=${p.conf_threshold})`;
+    else if (b.kind === "soft_nms") expr = `SoftNMS(iou_threshold=${p.iou_threshold}, sigma=${p.sigma})`;
+
+    lines.push(`            ("block_${li}_${b.kind}", ${expr}),`); li++;
+  });
+  
+  const lossLine = lossConfig ? `\ncriterion = ${generateLossExpr(lossConfig)}` : "";
+  const trainLoopCode = generatePyTorchTrainingLoop("od", trainSettings, dataset); // Can reuse CNN logic for now
+
+  return `import torch, torch.nn as nn
+from collections import OrderedDict
+from torchvision import transforms
+
+# --- Building block classes (Placeholder for actual implementations) ---
+# Ensure you have implementations for CSPDarknet, FPN, YOLOHead, etc.
+
+class CustomObjectDetector(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.blocks = nn.Sequential(OrderedDict([
+${lines.join("\n") || '            ("identity", nn.Identity()),'}
+        ]))
+
+    def forward(self, x):
+        return self.blocks(x)
+
+${genTransforms(dataset, augs, filterConfig)}
+
+DATASET_NAME = "${dataset.name}"
+MODEL_INPUT = (${dataset.shape[2]}, ${dataset.shape[0]}, ${dataset.shape[1]})
+${lossLine}
+model = CustomObjectDetector()
+print(f"Parameters: {sum(p.numel() for p in model.parameters()):,}")
+${trainLoopCode}
+`;
+}
+
 export function generateSklearnCode(graph, lossConfig, trainSettings) {
   const imp = new Set(["from sklearn.pipeline import Pipeline", "from sklearn.model_selection import train_test_split", "from sklearn.metrics import classification_report", "import matplotlib.pyplot as plt"]);
   const steps = [];
