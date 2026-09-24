@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Bot, BrainCircuit, Box, GitBranch, Copy, Download, Image as ImageIcon, Plus, Search, Sparkles, Trash2, AlertTriangle, XCircle, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Target } from "lucide-react";
+import { Bot, BrainCircuit, Box, GitBranch, Copy, Download, Image as ImageIcon, Plus, Search, Sparkles, Trash2, AlertTriangle, XCircle, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Target, FileCode } from "lucide-react";
 import { toPng } from 'html-to-image';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -39,6 +39,7 @@ export default function App() {
   
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
+  const [showCode, setShowCode] = useState(false);
 
   const [graphs, setGraphs] = useState({ cnn: makePreset("cnn", initialData), transformer: makePreset("transformer", initialData), unet: makePreset("unet", initialData), ml: makePreset("ml", csvDatasets[0]), od: makePreset("od", initialData) });
   const [losses, setLosses] = useState({ cnn: lossCatalog.cnn[0], transformer: lossCatalog.transformer[0], unet: lossCatalog.unet[0], ml: lossCatalog.ml[0], od: lossCatalog.od[0] });
@@ -353,13 +354,14 @@ export default function App() {
                 <span className="chip shape">{graph.length} blocks</span>
               </div>
               <div className="toolbar-actions">
+                <button onClick={() => setShowCode(!showCode)}><FileCode size={16}/> {showCode ? "Hide Live Code" : "Show Live Code"}</button>
                 <button onClick={captureDiagram}><ImageIcon size={16}/> Export Diagram</button>
                 <button onClick={() => setGraphs(p=>({...p,[mode]:[]}))}><Trash2 size={16}/> Clear Canvas</button>
               </div>
             </div>
 
-            <div className="canvas-container" ref={canvasRef} onDragOver={handleDragOverCanvas} onDrop={e=>handleDrop(e, graph.length)}>
-              <div className="canvas-inner" ref={canvasInnerRef}>
+            <div className="canvas-container" ref={canvasRef} onDragOver={handleDragOverCanvas} onDrop={e=>handleDrop(e, graph.length)} style={{ display: 'flex' }}>
+              <div className="canvas-inner" ref={canvasInnerRef} style={{ flex: 1, minWidth: 0 }}>
                 <svg className="svg-layer" aria-hidden="true">
                   <defs>
                     <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto"><polygon points="0 0, 8 4, 0 8" fill="var(--red)" /></marker>
@@ -424,6 +426,18 @@ export default function App() {
                 {dropTargetIdx === graph.length && <div className={`drop-indicator ${dropErrors.length>0?'invalid':''}`} style={{bottom: '-20px', top: 'auto'}}/>}
                 </div>
               </div>
+              
+              {showCode && (
+                <div className="live-code-panel" style={{ width: '450px', borderLeft: '1px solid var(--line-soft)', backgroundColor: '#1e1e1e', overflowY: 'auto', flexShrink: 0 }}>
+                  <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: '#1e1e1e', zIndex: 10 }}>
+                    <strong style={{ color: '#fff', fontSize: '12px' }}>Live Code Preview</strong>
+                    <button className="icon-btn mini" style={{ minHeight: '24px', width: '24px' }} onClick={() => setShowCode(false)}><XCircle size={14}/></button>
+                  </div>
+                  <SyntaxHighlighter language="python" style={vscDarkPlus} customStyle={{ margin: 0, padding: '16px', fontSize: '11.5px', background: 'transparent' }}>
+                    {generatedCode}
+                  </SyntaxHighlighter>
+                </div>
+              )}
             </div>
           </section>
         )}
