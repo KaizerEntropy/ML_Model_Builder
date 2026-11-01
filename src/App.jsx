@@ -11,6 +11,7 @@ import { calculateShapes } from "./utils/shapeCalc.js";
 import { validateArchitecture, issueMap } from "./utils/validation.js";
 import { generateTorchCode, generateTransformerCode, generateUnetCode, generateSklearnCode, generateODCode } from "./utils/codeGen.js";
 import VisualTab from "./components/VisualTab.jsx";
+import { createKaggleUrl } from "./utils/notebook.js";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 function cloneBlock(template) { return { id: uid(), kind: template.kind, label: template.label, glyph: template.glyph, params: structuredClone(template.params || {}), attention: [] }; }
@@ -76,6 +77,8 @@ export default function App() {
     cnn: "None", transformer: "None", unet: "None", ml: "None", od: "None"
   });
   const [toast, setToast] = useState("");
+  const [openingKaggle, setOpeningKaggle] = useState(false);
+  const [kaggleError, setKaggleError] = useState("");
   const [swapMenuId, setSwapMenuId] = useState(null);
   
   const [theme, setTheme] = useState("dark");
@@ -302,6 +305,41 @@ export default function App() {
     setGraphs(p => ({ ...p, [mode]: next }));
   }
 
+  async function runInKaggle() {
+    if (openingKaggle) return;
+    setKaggleError("");
+    // Open during the click so browser popup protection does not block the async handoff.
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      setKaggleError("Allow pop-ups for this site, then click Run in Kaggle again.");
+      return;
+    }
+    tab.opener = null;
+    tab.document.title = "Preparing your Kaggle notebook…";
+    tab.document.body.textContent = "Preparing your Model Forge notebook for Kaggle…";
+    setOpeningKaggle(true);
+    try {
+      const { notebookUrl, kaggleUrl } = await createKaggleUrl(
+        { code: generatedCode, mode, datasetName: dataset.name },
+        import.meta.env.VITE_NOTEBOOK_BASE_URL || window.location.origin,
+      );
+      const response = await fetch(notebookUrl, { credentials: "omit", signal: AbortSignal.timeout(15000) });
+      const notebook = response.ok && response.headers.get("Content-Type")?.includes("application/json")
+        ? await response.json() : null;
+      if (notebook?.nbformat !== 4 || !Array.isArray(notebook.cells)) {
+        throw new Error("The notebook service is unavailable. Try again after deployment, or use Download Code.");
+      }
+      if (!tab.closed) tab.location.replace(kaggleUrl);
+    } catch (error) {
+      tab.close();
+      setKaggleError(error instanceof TypeError || error.name === "TimeoutError"
+        ? "Could not reach the notebook service. Try again, or use Download Code."
+        : error.message);
+    } finally {
+      setOpeningKaggle(false);
+    }
+  }
+
   function captureDiagram() {
     if (!canvasInnerRef.current) return;
     setToast("Capturing diagram...");
@@ -340,9 +378,10 @@ export default function App() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a"); a.href = url; a.download = `model_${mode}.py`; a.click();
           }}><Download size={18} /></button>
-          <button className="primary" onClick={() => window.open("https://kaggle.com/code/new", "_blank")}>Run in Kaggle</button>
+          <button className="primary" onClick={runInKaggle} disabled={openingKaggle} aria-busy={openingKaggle}>{openingKaggle ? "Preparing notebook…" : "Run in Kaggle"}</button>
         </div>
       </header>
+      {kaggleError && <div className="kaggle-error" role="alert"><span>{kaggleError}</span><button className="icon-btn mini" aria-label="Dismiss Kaggle error" onClick={() => setKaggleError("")}><XCircle size={16} /></button></div>}
 
       <main className={`workspace ${leftOpen?"":"close-left"} ${rightOpen?"":"close-right"}`}>
         {leftOpen && (

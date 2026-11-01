@@ -33,7 +33,17 @@ Vercel will detect Vite, install dependencies, run `npm run build`, and serve th
 - Per-block feature-map estimates for CNN diagrams.
 - Dataset and augmentation panel.
 - Download generated Python code, SVG diagram, or graph JSON.
-- Kaggle button opens a new notebook and copies the generated code.
+- Run in Kaggle opens the complete generated code as a preloaded Python notebook; manual Python downloads remain available.
+
+## Run in Kaggle
+
+Deploy the app to Vercel, then click **Run in Kaggle**. The button snapshots the currently generated code, compresses it into a notebook source URL, verifies that the notebook endpoint responds, and opens Kaggle's [Load from URL flow](https://www.kaggle.com/discussions/product-feedback/152480). Sign into Kaggle if requested, then use **Run All** in the editor. This imports the code; it does not start training automatically or attach dataset files. Existing dataset loaders and advanced block placeholders still need implementation where marked in the generated code.
+
+The `/api/notebook.ipynb` endpoint returns a standard Jupyter notebook with the exact code shown in the app, including your model, dataset references, augmentations, loss, and training settings. The generated code is encoded in the URL, which anyone holding the link can read. There is no notebook database or Kaggle API key to configure. Large notebooks that exceed the link limit show an error and can still be downloaded manually.
+
+Kaggle must be able to fetch that endpoint over public HTTPS without deployment authentication. Localhost cannot be imported by Kaggle. For local development against an existing public deployment, optionally set `VITE_NOTEBOOK_BASE_URL=https://your-app.vercel.app` in `.env.local` and restart Vite. Otherwise use the deployed app for the Kaggle handoff. Vite dev and preview include the notebook endpoint for local API checks.
+
+Run `npm test` to check notebook generation and import-link round trips across all five model modes.
 
 ## API Recommendation
 

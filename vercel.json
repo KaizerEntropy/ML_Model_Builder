@@ -14,7 +14,11 @@
   ],
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/notebook.ipynb",
+      "destination": "/api/notebook"
+    },
+    {
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]

@@ -5,6 +5,7 @@
   "description": "Vercel-ready React app for interactive CNN and classical ML model building.",
   "type": "module",
   "scripts": {
+    "test": "node --test tests/*.test.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
